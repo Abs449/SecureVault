@@ -66,6 +66,20 @@ export async function signIn(email: string, accountPassword: string): Promise<st
     return config.salt;
   } catch (error: any) {
     console.error('Sign in error:', error);
+    
+    // Handle specific Firebase Auth errors
+    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      throw new Error('Invalid email or account password. Please check your credentials and try again.');
+    }
+    
+    if (error.code === 'auth/too-many-requests') {
+      throw new Error('Too many failed login attempts. Please try again later.');
+    }
+
+    if (error.code === 'auth/operation-not-allowed') {
+      throw new Error('Email/Password sign-in is not enabled in your Firebase project. Please enable it in the Firebase Console.');
+    }
+
     throw new Error(error.message || 'Failed to sign in');
   }
 }
