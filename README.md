@@ -1,36 +1,171 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SecureVault - Zero-Knowledge Password Manager
 
-## Getting Started
+A secure password manager built with Next.js, TypeScript, and Firebase, featuring client-side AES-256-CBC encryption and a zero-knowledge architecture.
 
-First, run the development server:
+## 🔒 Security Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Client-Side Encryption**: All encryption/decryption happens in the browser using Web Crypto API
+- **AES-256-CBC**: Industry-standard encryption algorithm
+- **PBKDF2 Key Derivation**: 100,000 iterations with SHA-256
+- **Zero-Knowledge Architecture**: Your master password never leaves your device
+- **Auto-Lock**: Vault automatically locks after 15 minutes of inactivity
+- **No Password Recovery**: By design - if you forget your master password, data is permanently lost
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- A Firebase project with Authentication and Firestore enabled
+
+### Setup Instructions
+
+1. **Clone and install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Configure Firebase**:
+   - Go to [Firebase Console](https://console.firebase.google.com)
+   - Create a new project or use an existing one
+   - Enable **Authentication** → **Email/Password** sign-in method
+   - Enable **Firestore Database** in production mode
+   - Copy your project configuration
+
+3. **Set up environment variables**:
+   - Copy `env.example` to `.env.local`:
+     ```bash
+     cp env.example .env.local
+     ```
+   - Fill in your Firebase credentials in `.env.local`:
+     ```
+     NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+     NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+     NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+     ```
+
+4. **Deploy Firestore security rules**:
+   - Go to Firebase Console → Firestore Database → Rules
+   - Copy the rules from `firestore.rules` and publish them
+
+5. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
+
+6. **Open your browser**:
+   - Navigate to [http://localhost:3000](http://localhost:3000)
+   - Create an account and start using your password manager!
+
+## 📁 Project Structure
+
+```
+src/
+├── app/                    # Next.js pages
+│   ├── page.tsx           # Login page
+│   ├── register/          # Registration page
+│   └── dashboard/         # Main vault dashboard
+├── components/            # React components
+│   ├── AddPasswordModal.tsx
+│   ├── LockScreen.tsx
+│   ├── PasswordCard.tsx
+│   └── PasswordGenerator.tsx
+├── context/               # React contexts
+│   ├── AuthContext.tsx   # Firebase auth state
+│   └── VaultContext.tsx  # Vault management & encryption
+└── lib/                   # Core libraries
+    ├── crypto.ts         # Encryption utilities
+    ├── firebase.ts       # Firebase configuration
+    ├── auth.ts           # Authentication service
+    ├── vault.ts          # Firestore operations
+    └── types.ts          # TypeScript definitions
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🔐 How It Works
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Two-Password System
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Account Password**: Used for Firebase Authentication (stored in Firebase)
+2. **Master Password**: Used for encryption/decryption (NEVER sent to server)
 
-## Learn More
+### Encryption Flow
 
-To learn more about Next.js, take a look at the following resources:
+1. User creates account with account password (Firebase Auth)
+2. A random salt is generated and stored in Firestore
+3. Master password + salt → PBKDF2 (100K iterations) → Encryption key
+4. Data is encrypted with AES-256-CBC before being sent to Firestore
+5. Firestore only stores encrypted blobs + initialization vectors
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Decryption Flow
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. User signs in with account password (Firebase Auth)
+2. Salt is retrieved from Firestore
+3. User enters master password
+4. Master password + salt → PBKDF2 → Encryption key (derived client-side)
+5. Encrypted data is fetched and decrypted in the browser
 
-## Deploy on Vercel
+## 🛡️ Security Considerations
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Master Password Requirements**: Minimum 12 characters with 3+ character types
+- **Auto-Lock**: Vault locks after 15 minutes of inactivity
+- **No Recovery**: Zero-knowledge means no password recovery - choose wisely!
+- **HTTPS Required**: Use HTTPS in production to prevent MITM attacks
+- **No Data in Storage**: Encryption key stays in memory only, never in localStorage
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📝 Firestore Data Structure
+
+```
+users/{userId}/
+  ├── config/
+  │   └── crypto/
+  │       └── salt: string (base64)
+  └── passwords/{passwordId}/
+      ├── encryptedData: string (encrypted JSON)
+      ├── iv: string (initialization vector)
+      ├── tags: string[]
+      ├── createdAt: timestamp
+      └── updatedAt: timestamp
+```
+
+## 🎨 Features
+
+- ✅ Secure password storage with client-side encryption
+- ✅ Password generator with customizable options
+- ✅ Search and filter passwords
+- ✅ Tags for organization
+- ✅ Copy to clipboard
+- ✅ Show/hide password toggle
+- ✅ Auto-lock after inactivity
+- ✅ Password strength indicator
+- ✅ Responsive design with glassmorphism UI
+
+## 🧪 Technology Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Custom CSS with Tailwind
+- **Authentication**: Firebase Auth
+- **Database**: Cloud Firestore
+- **Encryption**: Web Crypto API (AES-256-CBC, PBKDF2)
+
+## ⚠️ Important Warnings
+
+1. **Backup Your Master Password**: Store it in a secure location. If lost, all data is unrecoverable.
+2. **Production Deployment**: Use HTTPS and configure proper Firebase security rules.
+3. **Regular Backups**: Consider exporting your passwords periodically.
+4. **Browser Compatibility**: Requires modern browsers that support Web Crypto API.
+
+## 📄 License
+
+This project is provided as-is for educational and personal use.
+
+## 🤝 Contributing
+
+Contributions welcome! Please ensure all security features are maintained.
+
+---
+
+**Built with ❤️ and 🔒 for privacy-conscious users**

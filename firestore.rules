@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can only access their own data
+    match /users/{userId} {
+      // Allow read/write only if authenticated and accessing own data
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Config subcollection (stores salt)
+      match /config/{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Passwords subcollection (stores encrypted password entries)
+      match /passwords/{passwordId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

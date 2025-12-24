@@ -1,65 +1,151 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { useVault } from '@/context/VaultContext';
+import { signIn } from '@/lib/auth';
+import Link from 'next/link';
+
+export default function HomePage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const { unlockVault } = useVault();
+
+  const [email, setEmail] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [masterPassword, setMasterPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      // Sign in and get user's salt
+      const salt = await signIn(email, accountPassword);
+
+      // Unlock vault with master password
+      await unlockVault(masterPassword, salt);
+
+      // Redirect to dashboard
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="spinner" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-md animate-slide-in">
+        <div className="text-center mb-8">
+          <h1 className="text-5xl font-bold mb-3">
+            <span className="gradient-text">SecureVault</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <p className="text-text-secondary text-lg">Zero-Knowledge Password Manager</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="glass p-8">
+          <h2 className="text-2xl font-semibold mb-6">Sign In</h2>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                className="input"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="accountPassword">Account Password</label>
+              <input
+                id="accountPassword"
+                type="password"
+                className="input"
+                placeholder="Your account password"
+                value={accountPassword}
+                onChange={(e) => setAccountPassword(e.target.value)}
+                required
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                Used for authentication only
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="masterPassword">Master Password</label>
+              <input
+                id="masterPassword"
+                type="password"
+                className="input"
+                placeholder="Your master password"
+                value={masterPassword}
+                onChange={(e) => setMasterPassword(e.target.value)}
+                required
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                Used to decrypt your passwords
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <div className="spinner" />
+                  Signing In...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm">
+            <p className="text-text-secondary">
+              Don't have an account?{' '}
+              <Link href="/register" className="text-accent-primary hover:text-accent-secondary">
+                Sign Up
+              </Link>
+            </p>
+          </div>
         </div>
-      </main>
-    </div>
+
+        <div className="mt-6 p-4 glass text-center text-xs text-text-secondary">
+          <p className="mb-2">🔒 Client-Side Encryption • Zero-Knowledge Architecture</p>
+          <p>Your master password never leaves your device</p>
+        </div>
+      </div>
+    </main>
   );
 }
