@@ -114,13 +114,8 @@ export default function HomePage() {
             </div>
 
             {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg animate-fade-in">
-                <p className="text-red-400 text-sm font-medium">{error}</p>
-                {error.includes('Invalid email or account password') && (
-                  <p className="text-xs text-text-secondary mt-2 border-t border-red-500/20 pt-2">
-                    💡 <strong>Tip:</strong> Remember that your <strong>Account Password</strong> is what you use for logging in, while your <strong>Master Password</strong> is used to decrypt your vault locally.
-                  </p>
-                )}
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                {error}
               </div>
             )}
 

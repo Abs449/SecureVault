@@ -95,18 +95,18 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+    <main className="min-h-screen flex items-start justify-center p-8 md:p-12">
+      <div className="w-full max-w-6xl">
         {/* Header */}
-        <div className="mb-8 animate-slide-in">
-          <div className="flex justify-between items-center mb-4">
+        <div className="mb-12 animate-slide-in">
+          <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-4xl font-bold gradient-text mb-2">SecureVault</h1>
-              <p className="text-text-secondary">
+              <h1 className="text-5xl font-bold gradient-text mb-3">SecureVault</h1>
+              <p className="text-text-secondary text-lg">
                 Welcome, {user.email} • {entries.length} password{entries.length !== 1 ? 's' : ''}
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <button onClick={handleLock} className="btn btn-secondary">
                 🔒 Lock
               </button>
@@ -117,7 +117,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Search and Add */}
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             <input
               type="text"
               placeholder="🔍 Search passwords..."
@@ -125,7 +125,7 @@ export default function DashboardPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
+            <button onClick={() => setShowAddModal(true)} className="btn btn-primary whitespace-nowrap">
               + Add Password
             </button>
           </div>

@@ -1,42 +1,39 @@
-// Authentication service layer
-
+import { auth, db } from './firebase';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  User as FirebaseUser,
+  signOut as firebaseSignOut
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
 import { generateSalt, saltToBase64 } from './crypto';
 import { CryptoConfig } from './types';
 
 /**
- * Sign up a new user
- * @param email - User's email for Firebase Auth
- * @param accountPassword - Password for Firebase Auth (NOT the master password)
- * @param masterPassword - Master password for encryption (stored as salt only)
+ * Sign up a new user with email, account password, and master password.
+ * @param email - User's email
+ * @param accountPassword - Password for Firebase Auth
+ * @param masterPassword - Password for client-side encryption (not sent to Firebase Auth)
  */
-export async function signUp(
-  email: string,
-  accountPassword: string,
-  masterPassword: string
-): Promise<void> {
+export async function signUp(email: string, accountPassword: string, masterPassword: string): Promise<void> {
   try {
-    // Create Firebase Auth user
+    // 1. Create user in Firebase Auth using the account password
     const userCredential = await createUserWithEmailAndPassword(auth, email, accountPassword);
     const userId = userCredential.user.uid;
 
-    // Generate and store salt for this user
-    const salt = generateSalt();
+    // 2. Generate a random salt for this user
+    const saltBuffer = generateSalt();
+    const salt = saltToBase64(saltBuffer);
+
+    // 3. Store the salt and crypto configuration in Firestore
+    // This salt is needed to derive the same key from the master password later.
     const config: CryptoConfig = {
-      salt: saltToBase64(salt),
+      salt
     };
 
-    // Store salt in Firestore (used for key derivation)
     await setDoc(doc(db, 'users', userId, 'config', 'crypto'), config);
 
-    console.log('User registered successfully');
+    // Create base collection for passwords
+    // Firestore creates collections implicitly when the first document is added.
   } catch (error: any) {
     console.error('Sign up error:', error);
     throw new Error(error.message || 'Failed to sign up');
@@ -44,61 +41,40 @@ export async function signUp(
 }
 
 /**
- * Sign in an existing user
+ * Sign in an existing user and retrieve their salt.
  * @param email - User's email
  * @param accountPassword - Password for Firebase Auth
- * @returns The user's salt (for deriving encryption key)
+ * @returns The user's unique salt for key derivation
  */
 export async function signIn(email: string, accountPassword: string): Promise<string> {
   try {
-    // Sign in with Firebase Auth
+    // 1. Sign in with Firebase Auth using the account password
     const userCredential = await signInWithEmailAndPassword(auth, email, accountPassword);
     const userId = userCredential.user.uid;
 
-    // Retrieve the user's salt
+    // 2. Retrieve the user's salt from Firestore
     const configDoc = await getDoc(doc(db, 'users', userId, 'config', 'crypto'));
 
     if (!configDoc.exists()) {
-      throw new Error('User configuration not found');
+      throw new Error('User configuration not found. Potential data corruption.');
     }
 
     const config = configDoc.data() as CryptoConfig;
     return config.salt;
   } catch (error: any) {
     console.error('Sign in error:', error);
-    
-    // Handle specific Firebase Auth errors
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-      throw new Error('Invalid email or account password. Please check your credentials and try again.');
-    }
-    
-    if (error.code === 'auth/too-many-requests') {
-      throw new Error('Too many failed login attempts. Please try again later.');
-    }
-
-    if (error.code === 'auth/operation-not-allowed') {
-      throw new Error('Email/Password sign-in is not enabled in your Firebase project. Please enable it in the Firebase Console.');
-    }
-
     throw new Error(error.message || 'Failed to sign in');
   }
 }
 
 /**
- * Sign out the current user
+ * Sign out the current user.
  */
 export async function signOut(): Promise<void> {
   try {
     await firebaseSignOut(auth);
   } catch (error: any) {
     console.error('Sign out error:', error);
-    throw new Error('Failed to sign out');
+    throw new Error(error.message || 'Failed to sign out');
   }
-}
-
-/**
- * Get current authenticated user
- */
-export function getCurrentUser(): FirebaseUser | null {
-  return auth.currentUser;
 }

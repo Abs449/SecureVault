@@ -1,14 +1,14 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-import { AuthProvider } from '@/context/AuthContext';
-import { VaultProvider } from '@/context/VaultContext';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
+import { VaultProvider } from "@/context/VaultContext";
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'SecureVault - Zero-Knowledge Password Manager',
-  description: 'Client-side encrypted password manager with zero-knowledge architecture',
+  title: "SecureVault - Zero-Knowledge Password Manager",
+  description: "Securely store and manage your passwords with client-side encryption.",
 };
 
 export default function RootLayout({
@@ -17,10 +17,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
+    <html lang="en">
+      <body className={inter.className}>
         <AuthProvider>
-          <VaultProvider>{children}</VaultProvider>
+          <VaultProvider>
+            {children}
+          </VaultProvider>
         </AuthProvider>
       </body>
     </html>

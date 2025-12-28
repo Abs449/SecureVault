@@ -41,23 +41,22 @@ export default function AddPasswordModal({ entry, onClose }: AddPasswordModalPro
     setLoading(true);
 
     try {
-      const data: PasswordData = {
+      const entryData = {
         title: title.trim(),
         username: username.trim(),
         password,
         url: url.trim(),
         notes: notes.trim(),
+        tags: tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter((tag) => tag.length > 0),
       };
 
-      const tagArray = tags
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter((tag) => tag.length > 0);
-
       if (entry) {
-        await updateEntry(entry.id, data, tagArray);
+        await updateEntry(entry.id, entryData);
       } else {
-        await addEntry(data, tagArray);
+        await addEntry(entryData);
       }
 
       onClose();

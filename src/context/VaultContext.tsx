@@ -1,294 +1,191 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-} from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { deriveKey, encrypt, decrypt, base64ToSalt } from '@/lib/crypto';
-import {
-  getPasswordEntries,
-  addPasswordEntry,
-  updatePasswordEntry as updatePasswordEntryInDB,
-  deletePasswordEntry as deletePasswordEntryFromDB,
-} from '@/lib/vault';
-import { PasswordEntry, DecryptedPasswordEntry, PasswordData } from '@/lib/types';
+import * as vaultApi from '@/lib/vault';
+import { DecryptedPasswordEntry, PasswordEntry } from '@/lib/types';
 
 interface VaultContextType {
   isUnlocked: boolean;
   entries: DecryptedPasswordEntry[];
   loading: boolean;
+  error: string | null;
   unlockVault: (masterPassword: string, salt: string) => Promise<void>;
   lockVault: () => void;
-  addEntry: (data: PasswordData, tags: string[]) => Promise<void>;
-  updateEntry: (id: string, data: PasswordData, tags: string[]) => Promise<void>;
+  addEntry: (entry: Omit<DecryptedPasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateEntry: (id: string, updates: Partial<DecryptedPasswordEntry>) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
-  refreshEntries: () => Promise<void>;
 }
 
 const VaultContext = createContext<VaultContextType | undefined>(undefined);
 
-const AUTO_LOCK_TIMEOUT = 15 * 60 * 1000; // 15 minutes
-
-export function VaultProvider({ children }: { children: ReactNode }) {
+export function VaultProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [encryptionKey, setEncryptionKey] = useState<CryptoKey | null>(null);
   const [entries, setEntries] = useState<DecryptedPasswordEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [encryptionKey, setEncryptionKey] = useState<CryptoKey | null>(null);
-  
-  const autoLockTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
 
-  // Debug: Log entries when they change
+  const AUTO_LOCK_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 
-  
-
-  // Reset auto-lock timer on activity
-  const resetAutoLockTimer = useCallback(() => {
-    if (autoLockTimerRef.current) {
-      clearTimeout(autoLockTimerRef.current);
-    }
-
-    autoLockTimerRef.current = setTimeout(() => {
-      lockVault();
-    }, AUTO_LOCK_TIMEOUT);
-  }, []);
-
-  // Unlock vault with master password
-  const unlockVault = useCallback(
-    async (masterPassword: string, salt: string) => {
-      setLoading(true);
-      try {
-        // Derive encryption key from master password
-        const saltArray = base64ToSalt(salt);
-        const key = await deriveKey(masterPassword, saltArray);
-        setEncryptionKey(key);
-
-        // Fetch and decrypt all entries
-        if (user) {
-          const encryptedEntries = await getPasswordEntries(user.uid);
-          const decrypted = await Promise.all(
-            encryptedEntries.map(async (entry) => {
-              try {
-                const decryptedData = await decrypt(entry.encryptedData, entry.iv, key);
-                const data: PasswordData = JSON.parse(decryptedData);
-                return {
-                  id: entry.id,
-                  ...data,
-                  tags: entry.tags,
-                  createdAt: entry.createdAt,
-                  updatedAt: entry.updatedAt,
-                };
-              } catch (error) {
-                console.error('Failed to decrypt entry:', entry.id, error);
-                // Return a placeholder for failed decryption
-                return {
-                  id: entry.id,
-                  title: '[Decryption Failed]',
-                  username: '',
-                  password: '',
-                  url: '',
-                  notes: '',
-                  tags: entry.tags,
-                  createdAt: entry.createdAt,
-                  updatedAt: entry.updatedAt,
-                };
-              }
-            })
-          );
-
-          setEntries(decrypted);
-          setIsUnlocked(true);
-          resetAutoLockTimer();
-        }
-      } catch (error) {
-        console.error('Failed to unlock vault:', error);
-        throw error;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [user, resetAutoLockTimer]
-  );
-
-  // Lock vault
+  // Auto-lock mechanism
   const lockVault = useCallback(() => {
+    setIsUnlocked(false);
     setEncryptionKey(null);
     setEntries([]);
-    setIsUnlocked(false);
-    if (autoLockTimerRef.current) {
-      clearTimeout(autoLockTimerRef.current);
-    }
+    setError(null);
   }, []);
 
-  // Add new entry
-  const addEntry = useCallback(
-    async (data: PasswordData, tags: string[]) => {
-      if (!encryptionKey || !user) throw new Error('Vault is locked');
+  useEffect(() => {
+    if (!isUnlocked) return;
 
-      resetAutoLockTimer();
-      setLoading(true);
-
-      try {
-        // Encrypt the data
-        const dataJson = JSON.stringify(data);
-        const { data: encryptedData, iv } = await encrypt(dataJson, encryptionKey);
-
-        // Store in Firestore
-        const entryId = await addPasswordEntry(user.uid, {
-          encryptedData,
-          iv,
-          tags,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-
-        // Add to local state
-        const newEntry: DecryptedPasswordEntry = {
-          id: entryId,
-          ...data,
-          tags,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-
-        setEntries((prev) => [...prev, newEntry]);
-      } catch (error) {
-        console.error('Failed to add entry:', error);
-        throw error;
-      } finally {
-        setLoading(false);
+    const checkTimeout = setInterval(() => {
+      if (Date.now() - lastActivity > AUTO_LOCK_TIMEOUT) {
+        lockVault();
       }
-    },
-    [encryptionKey, user, resetAutoLockTimer]
-  );
+    }, 60000); // Check every minute
 
-  // Update entry
-  const updateEntry = useCallback(
-    async (id: string, data: PasswordData, tags: string[]) => {
-      if (!encryptionKey || !user) throw new Error('Vault is locked');
+    return () => clearInterval(checkTimeout);
+  }, [isUnlocked, lastActivity, lockVault]);
 
-      resetAutoLockTimer();
-      setLoading(true);
+  // Update last activity on user interaction
+  useEffect(() => {
+    const handleActivity = () => setLastActivity(Date.now());
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+    };
+  }, []);
 
-      try {
-        // Encrypt the updated data
-        const dataJson = JSON.stringify(data);
-        const { data: encryptedData, iv } = await encrypt(dataJson, encryptionKey);
-
-        // Update in Firestore
-        await updatePasswordEntryInDB(user.uid, id, {
-          encryptedData,
-          iv,
-          tags,
-          updatedAt: Date.now(),
-        });
-
-        // Update local state
-        setEntries((prev) =>
-          prev.map((entry) =>
-            entry.id === id
-              ? { ...entry, ...data, tags, updatedAt: Date.now() }
-              : entry
-          )
-        );
-      } catch (error) {
-        console.error('Failed to update entry:', error);
-        throw error;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [encryptionKey, user, resetAutoLockTimer]
-  );
-
-  // Delete entry
-  const deleteEntry = useCallback(
-    async (id: string) => {
-      if (!user) throw new Error('Not authenticated');
-
-      resetAutoLockTimer();
-      setLoading(true);
-
-      try {
-        await deletePasswordEntryFromDB(user.uid, id);
-        setEntries((prev) => prev.filter((entry) => entry.id !== id));
-      } catch (error) {
-        console.error('Failed to delete entry:', error);
-        throw error;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [user, resetAutoLockTimer]
-  );
-
-  // Refresh entries from Firestore
-  const refreshEntries = useCallback(async () => {
-    if (!encryptionKey || !user) return;
-
-    resetAutoLockTimer();
+  const unlockVault = async (masterPassword: string, salt: string) => {
     setLoading(true);
-
+    setError(null);
     try {
-      const encryptedEntries = await getPasswordEntries(user.uid);
-      const decrypted = await Promise.all(
+      if (!user) throw new Error('User not authenticated');
+
+      // 1. Derive the key from master password and salt
+      const saltBuffer = base64ToSalt(salt);
+      const key = await deriveKey(masterPassword, saltBuffer);
+      setEncryptionKey(key);
+
+      // 2. Fetch encrypted entries from Firestore
+      const encryptedEntries = await vaultApi.getPasswordEntries(user.uid);
+
+      // 3. Decrypt entries
+      const decryptedEntries = await Promise.all(
         encryptedEntries.map(async (entry) => {
-          try {
-            const decryptedData = await decrypt(entry.encryptedData, entry.iv, encryptionKey);
-            const data: PasswordData = JSON.parse(decryptedData);
-            return {
-              id: entry.id,
-              ...data,
-              tags: entry.tags,
-              createdAt: entry.createdAt,
-              updatedAt: entry.updatedAt,
-            };
-          } catch (error) {
-            console.error('Failed to decrypt entry:', entry.id);
-            return {
-              id: entry.id,
-              title: '[Decryption Failed]',
-              username: '',
-              password: '',
-              url: '',
-              notes: '',
-              tags: entry.tags,
-              createdAt: entry.createdAt,
-              updatedAt: entry.updatedAt,
-            };
-          }
+          const decryptedData = await decrypt(entry.encryptedData, entry.iv, key);
+          const parsedData = JSON.parse(decryptedData);
+          return {
+            ...parsedData,
+            id: entry.id,
+            createdAt: entry.createdAt,
+            updatedAt: entry.updatedAt,
+          } as DecryptedPasswordEntry;
         })
       );
 
-      setEntries(decrypted);
-    } catch (error) {
-      console.error('Failed to refresh entries:', error);
+      setEntries(decryptedEntries);
+      setIsUnlocked(true);
+    } catch (err: any) {
+      console.error('Vault unlock error:', err);
+      setError('Invalid master password or decryption failed');
+      throw err;
     } finally {
       setLoading(false);
     }
-  }, [encryptionKey, user, resetAutoLockTimer]);
+  };
 
-  // Lock vault when user signs out
-  useEffect(() => {
-    if (!user) {
-      lockVault();
+  const addEntry = async (entry: Omit<DecryptedPasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!isUnlocked || !encryptionKey || !user) throw new Error('Vault is locked');
+
+    try {
+      setLoading(true);
+      const serializedData = JSON.stringify(entry);
+      const { data: encryptedData, iv } = await encrypt(serializedData, encryptionKey);
+      
+      const newEntryId = await vaultApi.addPasswordEntry(user.uid, {
+        encryptedData,
+        iv,
+        tags: entry.tags || [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      const fullEntry: DecryptedPasswordEntry = {
+        ...entry,
+        id: newEntryId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      setEntries((prev) => [fullEntry, ...prev]);
+    } catch (err) {
+      console.error('Add entry error:', err);
+      setError('Failed to add password entry');
+      throw err;
+    } finally {
+      setLoading(false);
     }
-  }, [user, lockVault]);
+  };
 
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (autoLockTimerRef.current) {
-        clearTimeout(autoLockTimerRef.current);
-      }
-    };
-  }, []);
+  const updateEntry = async (id: string, updates: Partial<DecryptedPasswordEntry>) => {
+    if (!isUnlocked || !encryptionKey || !user) throw new Error('Vault is locked');
+
+    try {
+      setLoading(true);
+      const existingEntry = entries.find((e) => e.id === id);
+      if (!existingEntry) throw new Error('Entry not found');
+
+      const updatedFullEntry = { ...existingEntry, ...updates };
+      const serializedData = JSON.stringify({
+        title: updatedFullEntry.title,
+        username: updatedFullEntry.username,
+        password: updatedFullEntry.password,
+        url: updatedFullEntry.url,
+        notes: updatedFullEntry.notes
+      });
+      const { data: encryptedData, iv } = await encrypt(serializedData, encryptionKey);
+
+      await vaultApi.updatePasswordEntry(user.uid, id, {
+        encryptedData,
+        iv,
+        tags: updatedFullEntry.tags || [],
+        updatedAt: Date.now(),
+      });
+
+      setEntries((prev) =>
+        prev.map((e) => (e.id === id ? { ...updatedFullEntry, updatedAt: Date.now() } : e))
+      );
+    } catch (err) {
+      console.error('Update entry error:', err);
+      setError('Failed to update password entry');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteEntry = async (id: string) => {
+    if (!isUnlocked || !user) throw new Error('Vault is locked');
+
+    try {
+      setLoading(true);
+      await vaultApi.deletePasswordEntry(user.uid, id);
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+    } catch (err) {
+      console.error('Delete entry error:', err);
+      setError('Failed to delete password entry');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <VaultContext.Provider
@@ -296,12 +193,12 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         isUnlocked,
         entries,
         loading,
+        error,
         unlockVault,
         lockVault,
         addEntry,
         updateEntry,
         deleteEntry,
-        refreshEntries,
       }}
     >
       {children}
@@ -311,7 +208,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 
 export function useVault() {
   const context = useContext(VaultContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useVault must be used within a VaultProvider');
   }
   return context;
