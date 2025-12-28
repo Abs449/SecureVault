@@ -9,80 +9,7 @@ A secure password manager built with Next.js, TypeScript, and Firebase, featurin
 - **PBKDF2 Key Derivation**: 100,000 iterations with SHA-256
 - **Zero-Knowledge Architecture**: Your master password never leaves your device
 - **Auto-Lock**: Vault automatically locks after 15 minutes of inactivity
-- **No Password Recovery**: By design - if you forget your master password, data is permanently lost
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- A Firebase project with Authentication and Firestore enabled
-
-### Setup Instructions
-
-1. **Clone and install dependencies**:
-   ```bash
-   npm install
-   ```
-
-2. **Configure Firebase**:
-   - Go to [Firebase Console](https://console.firebase.google.com)
-   - Create a new project or use an existing one
-   - Enable **Authentication** → **Email/Password** sign-in method
-   - Enable **Firestore Database** in production mode
-   - Copy your project configuration
-
-3. **Set up environment variables**:
-   - Copy `env.example` to `.env.local`:
-     ```bash
-     cp env.example .env.local
-     ```
-   - Fill in your Firebase credentials in `.env.local`:
-     ```
-     NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-     NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-     NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
-     ```
-
-4. **Deploy Firestore security rules**:
-   - Go to Firebase Console → Firestore Database → Rules
-   - Copy the rules from `firestore.rules` and publish them
-
-5. **Run the development server**:
-   ```bash
-   npm run dev
-   ```
-
-6. **Open your browser**:
-   - Navigate to [http://localhost:3000](http://localhost:3000)
-   - Create an account and start using your password manager!
-
-## 📁 Project Structure
-
-```
-src/
-├── app/                    # Next.js pages
-│   ├── page.tsx           # Login page
-│   ├── register/          # Registration page
-│   └── dashboard/         # Main vault dashboard
-├── components/            # React components
-│   ├── AddPasswordModal.tsx
-│   ├── LockScreen.tsx
-│   ├── PasswordCard.tsx
-│   └── PasswordGenerator.tsx
-├── context/               # React contexts
-│   ├── AuthContext.tsx   # Firebase auth state
-│   └── VaultContext.tsx  # Vault management & encryption
-└── lib/                   # Core libraries
-    ├── crypto.ts         # Encryption utilities
-    ├── firebase.ts       # Firebase configuration
-    ├── auth.ts           # Authentication service
-    ├── vault.ts          # Firestore operations
-    └── types.ts          # TypeScript definitions
-```
+- **No Password Recovery**: By design - if you forget your master password, data is permanently
 
 ## 🔐 How It Works
 
@@ -115,21 +42,6 @@ src/
 - **HTTPS Required**: Use HTTPS in production to prevent MITM attacks
 - **No Data in Storage**: Encryption key stays in memory only, never in localStorage
 
-## 📝 Firestore Data Structure
-
-```
-users/{userId}/
-  ├── config/
-  │   └── crypto/
-  │       └── salt: string (base64)
-  └── passwords/{passwordId}/
-      ├── encryptedData: string (encrypted JSON)
-      ├── iv: string (initialization vector)
-      ├── tags: string[]
-      ├── createdAt: timestamp
-      └── updatedAt: timestamp
-```
-
 ## 🎨 Features
 
 - ✅ Secure password storage with client-side encryption
@@ -158,14 +70,3 @@ users/{userId}/
 3. **Regular Backups**: Consider exporting your passwords periodically.
 4. **Browser Compatibility**: Requires modern browsers that support Web Crypto API.
 
-## 📄 License
-
-This project is provided as-is for educational and personal use.
-
-## 🤝 Contributing
-
-Contributions welcome! Please ensure all security features are maintained.
-
----
-
-**Built with ❤️ and 🔒 for privacy-conscious users**
