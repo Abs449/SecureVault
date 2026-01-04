@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { VaultProvider } from "@/context/VaultContext";
+import { SystemCheck } from "@/components/SystemCheck";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,6 +21,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
         <AuthProvider>
+          <SystemCheck />
           <VaultProvider>
             {children}
           </VaultProvider>

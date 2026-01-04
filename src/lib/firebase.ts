@@ -1,8 +1,8 @@
 // Firebase configuration and initialization
 
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,9 +13,36 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only once
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// Validate config to fail fast with clear error
+const validateConfig = () => {
+  const missing = Object.entries(firebaseConfig)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+  if (missing.length > 0) {
+    const errorMsg = `Missing Firebase configuration keys: ${missing.join(', ')}. Check your .env.local file.`;
+    if (typeof window !== 'undefined') {
+      console.error(errorMsg);
+    }
+  }
+};
+
+validateConfig();
+
+// Initialize Firebase only once
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
+
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error("Failed to initialize Firebase:", error);
+  // We re-throw so the app knows it's broken, but the Error Boundary will catch it now.
+  throw error;
+}
+
+export { auth, db };
 export default app;
