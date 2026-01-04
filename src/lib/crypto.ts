@@ -39,7 +39,7 @@ export async function deriveKey(
   const derivedKey = await crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt,
+      salt: salt as BufferSource,
       iterations: PBKDF2_ITERATIONS,
       hash: PBKDF2_HASH,
     },
@@ -75,7 +75,7 @@ export async function encrypt(
   // Convert to base64 for storage
   return {
     data: arrayBufferToBase64(encryptedBuffer),
-    iv: arrayBufferToBase64(iv),
+    iv: arrayBufferToBase64(iv.buffer),
   };
 }
 
@@ -206,7 +206,7 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
  * Convert Uint8Array to base64 string
  */
 export function saltToBase64(salt: Uint8Array): string {
-  return arrayBufferToBase64(salt.buffer);
+  return arrayBufferToBase64(salt.buffer as ArrayBuffer);
 }
 
 /**

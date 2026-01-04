@@ -65,7 +65,7 @@ export default function HomePage() {
         </div>
 
         <div className="glass p-8">
-          <h2 className="text-2xl font-semibold mb-6">Sign In</h2>
+          <h2 className="text-2xl font-semibold mb-6 ml-[10px] mt-[20px]">Sign In</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
