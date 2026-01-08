@@ -1,19 +1,10 @@
 // SecureVault Chrome Extension - Popup Script
 // Handles authentication, vault management, and password CRUD operations
 
-// Firebase configuration - Using CDN approach for extension compatibility
-// Firebase configuration - PLEASE REPLACE WITH YOUR ACTUAL CREDENTIALS
-// You can find these in your Firebase Console -> Project Settings
-const firebaseConfig = {
-  apiKey: "AIzaSyDwuleRG0MI7EETi5j0rgBjsNxrItKUjUA",
-  authDomain: "passwordmanager-42b9a.firebaseapp.com",
-  projectId: "passwordmanager-42b9a",
-  storageBucket: "passwordmanager-42b9a.firebasestorage.app",
-  messagingSenderId: "928283070192",
-  appId: "1:928283070192:web:3948dbd69d0dabe229fc35",
-  measurementId: "G-F06Z49WW1Z"
-
-};
+// Firebase configuration - Loaded from config.js
+// If you are setting this up from GitHub, create a copy of config.example.js
+// as config.js and add your credentials there.
+const firebaseConfig = window.firebaseConfig;
 
 // ==================== CRYPTO MODULE ====================
 const PBKDF2_ITERATIONS = 100000;
