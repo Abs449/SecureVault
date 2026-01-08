@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecureVault - Save Popup Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      padding: 40px;
+      color: white;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 32px;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #a0a0b0;
+      margin-bottom: 60px;
+    }
+    
+    .demo-container {
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .demo-item {
+      text-align: center;
+    }
+    
+    .demo-label {
+      color: #6b6b80;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+    }
+    
+    /* Save Popup Styles */
+    .sv-popup-content {
+      width: 360px;
+      background: linear-gradient(135deg, #12121a 0%, #1a1a2e 100%);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 16px;
+      box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        0 0 40px rgba(99, 102, 241, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .sv-popup-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid rgba(100, 100, 150, 0.2);
+    }
+
+    .sv-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .sv-popup-title {
+      flex: 1;
+    }
+
+    .sv-popup-title h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.3;
+    }
+
+    .sv-popup-title span {
+      font-size: 12px;
+      color: #a0a0b0;
+    }
+
+    .sv-close-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(100, 100, 150, 0.2);
+      color: #a0a0b0;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .sv-close-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #ef4444;
+    }
+
+    .sv-popup-body {
+      padding: 16px 20px;
+    }
+
+    .sv-credential-info {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sv-field {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sv-label {
+      font-size: 12px;
+      color: #6b6b80;
+      font-weight: 500;
+    }
+
+    .sv-value {
+      font-size: 13px;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 10px;
+      border-radius: 6px;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sv-popup-actions {
+      display: flex;
+      gap: 10px;
+      padding: 16px 20px;
+      border-top: 1px solid rgba(100, 100, 150, 0.2);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .sv-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: none;
+      font-family: inherit;
+    }
+
+    .sv-btn-primary {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+      animation: sv-pulse 2s infinite;
+    }
+
+    .sv-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .sv-btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: #a0a0b0;
+      border: 1px solid rgba(100, 100, 150, 0.2);
+    }
+
+    .sv-btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      border-color: rgba(100, 100, 150, 0.4);
+    }
+
+    @keyframes sv-pulse {
+      0%, 100% {
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+      }
+      50% {
+        box-shadow: 0 4px 25px rgba(99, 102, 241, 0.5);
+      }
+    }
+    
+    /* Notification Toast */
+    .sv-notification {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #12121a 0%, #1a1a2e 100%);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      box-shadow: 
+        0 15px 40px rgba(0, 0, 0, 0.4),
+        0 0 30px rgba(99, 102, 241, 0.1);
+      color: #ffffff;
+      font-size: 13px;
+      backdrop-filter: blur(20px);
+      width: fit-content;
+    }
+
+    .sv-notif-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+    }
+    
+    .features {
+      max-width: 800px;
+      margin: 60px auto 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+    
+    .feature {
+      background: rgba(30, 30, 45, 0.7);
+      border: 1px solid rgba(100, 100, 150, 0.2);
+      border-radius: 12px;
+      padding: 24px;
+      transition: all 0.3s;
+    }
+    
+    .feature:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-4px);
+    }
+    
+    .feature h3 {
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+    
+    .feature p {
+      color: #a0a0b0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛡️ SecureVault Extension</h1>
+  <p class="subtitle">Premium password detection popup that appears on websites</p>
+  
+  <div class="demo-container">
+    <div class="demo-item">
+      <p class="demo-label">Save Password Popup</p>
+      <div class="sv-popup-content">
+        <div class="sv-popup-header">
+          <img src="icons/icon48.png" alt="SecureVault" class="sv-logo">
+          <div class="sv-popup-title">
+            <h3>SecureVault</h3>
+            <span>Save this password?</span>
+          </div>
+          <button class="sv-close-btn">×</button>
+        </div>
+        <div class="sv-popup-body">
+          <div class="sv-credential-info">
+            <div class="sv-field">
+              <span class="sv-label">Website</span>
+              <span class="sv-value">github.com</span>
+            </div>
+            <div class="sv-field">
+              <span class="sv-label">Username</span>
+              <span class="sv-value">user@example.com</span>
+            </div>
+          </div>
+        </div>
+        <div class="sv-popup-actions">
+          <button class="sv-btn sv-btn-secondary">Never for this site</button>
+          <button class="sv-btn sv-btn-primary">Save Password</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="demo-item">
+      <p class="demo-label">Notification Toast</p>
+      <div class="sv-notification">
+        <img src="icons/icon48.png" alt="SecureVault" class="sv-notif-icon">
+        <span>Password saved to SecureVault!</span>
+      </div>
+      <br><br>
+      <div class="sv-notification" style="border-color: rgba(16, 185, 129, 0.4);">
+        <img src="icons/icon48.png" alt="SecureVault" class="sv-notif-icon">
+        <span>Credentials filled automatically</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="features">
+    <div class="feature">
+      <h3>🔒 Auto-Detect</h3>
+      <p>Automatically detects password entries on any website when you submit a login form.</p>
+    </div>
+    <div class="feature">
+      <h3>🎨 Beautiful Design</h3>
+      <p>Premium dark glassmorphism design that seamlessly blends with any website.</p>
+    </div>
+    <div class="feature">
+      <h3>🔐 Zero-Knowledge</h3>
+      <p>All encryption happens client-side. Your master password never leaves your device.</p>
+    </div>
+    <div class="feature">
+      <h3>⚡ One-Click Save</h3>
+      <p>Save passwords with a single click. Decline once with "Never for this site" option.</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -15,8 +15,6 @@
 }
 
 * {
-  margin: 5px;
-  padding: 3px;
   box-sizing: border-box;
 }
 
@@ -25,7 +23,11 @@ body {
   background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   color: var(--text-primary);
   min-height: 100vh;
+  width: 400px; /* Fixed width for extension popup */
+  min-width: 400px;
   overflow-x: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 /* Glassmorphism effect */

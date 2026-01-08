@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=400, initial-scale=1.0">
+  <title>SecureVault</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-container">
+        <img src="icons/icon48.png" alt="SecureVault" class="logo">
+        <div class="brand">
+          <h1 class="brand-name">SecureVault</h1>
+          <span class="brand-tagline">Zero-Knowledge Security</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="lockBtn" class="icon-btn" title="Lock Vault">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </button>
+        <button id="settingsBtn" class="icon-btn" title="Settings">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Login View -->
+    <div id="loginView" class="view">
+      <div class="auth-card glass">
+        <div class="auth-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="url(#gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <defs>
+              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#8b5cf6"/>
+              </linearGradient>
+            </defs>
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <h2>Unlock Your Vault</h2>
+        <p class="auth-subtitle">Enter your credentials to access your passwords</p>
+        
+        <form id="loginForm" class="auth-form">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" class="input" placeholder="your@email.com" required>
+          </div>
+          <div class="form-group">
+            <label for="password">Account Password</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="password" class="input" placeholder="••••••••••••" required>
+              <button type="button" class="toggle-password" data-target="password">
+                <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="masterPassword">Master Password</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="masterPassword" class="input" placeholder="Your master password" required>
+              <button type="button" class="toggle-password" data-target="masterPassword">
+                <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">
+            <span>Unlock Vault</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"></path>
+              <path d="M12 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </form>
+        <div id="loginError" class="error-message hidden"></div>
+      </div>
+    </div>
+
+    <!-- Dashboard View -->
+    <div id="dashboardView" class="view hidden">
+      <!-- Search Bar -->
+      <div class="search-container">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search passwords...">
+      </div>
+
+      <!-- Password List -->
+      <div id="passwordList" class="password-list">
+        <!-- Passwords will be dynamically inserted here -->
+      </div>
+
+      <!-- Add Password Button -->
+      <button id="addPasswordBtn" class="fab">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Add/Edit Password Modal -->
+    <div id="passwordModal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content glass">
+        <div class="modal-header">
+          <h3 id="modalTitle">Add New Password</h3>
+          <button id="closeModal" class="icon-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        
+        <form id="passwordForm" class="password-form">
+          <div class="form-group">
+            <label for="siteTitle">Title / Website</label>
+            <input type="text" id="siteTitle" class="input" placeholder="e.g., Google, Netflix" required>
+          </div>
+          <div class="form-group">
+            <label for="siteUrl">URL</label>
+            <input type="url" id="siteUrl" class="input" placeholder="https://example.com">
+          </div>
+          <div class="form-group">
+            <label for="siteUsername">Username / Email</label>
+            <input type="text" id="siteUsername" class="input" placeholder="username@example.com" required>
+          </div>
+          <div class="form-group">
+            <label for="sitePassword">Password</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="sitePassword" class="input" placeholder="Enter password" required>
+              <button type="button" class="toggle-password" data-target="sitePassword">
+                <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+              <button type="button" id="generatePasswordBtn" class="generate-btn" title="Generate Password">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+              </button>
+            </div>
+            <!-- Password Strength -->
+            <div class="password-strength">
+              <div class="strength-bar-container">
+                <div id="strengthBar" class="strength-bar"></div>
+              </div>
+              <span id="strengthLabel" class="strength-label">Enter password</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="siteTags">Tags (comma separated)</label>
+            <input type="text" id="siteTags" class="input" placeholder="work, social, finance">
+          </div>
+          <div class="form-group">
+            <label for="siteNotes">Notes</label>
+            <textarea id="siteNotes" class="input textarea" placeholder="Optional notes..." rows="3"></textarea>
+          </div>
+          
+          <input type="hidden" id="editingId" value="">
+          
+          <div class="modal-actions">
+            <button type="button" id="cancelModal" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary">
+              <span id="submitBtnText">Save Password</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content glass">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button id="closeSettings" class="icon-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="settings-content">
+          <div class="setting-item">
+            <div class="setting-info">
+              <h4>Auto-save Prompts</h4>
+              <p>Show popup when password is detected</p>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="autoSaveToggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-info">
+              <h4>Auto-lock Timeout</h4>
+              <p>Lock vault after inactivity</p>
+            </div>
+            <select id="autoLockSelect" class="input select-input">
+              <option value="5">5 minutes</option>
+              <option value="15" selected>15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">1 hour</option>
+            </select>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-info">
+              <h4>Sign Out</h4>
+              <p>Log out of your account</p>
+            </div>
+            <button id="signOutBtn" class="btn btn-danger">Sign Out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+  </div>
+
+  <script src="lib/firebase-app.js"></script>
+  <script src="lib/firebase-auth.js"></script>
+  <script src="lib/firebase-firestore.js"></script>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

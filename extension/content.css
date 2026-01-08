@@ -1,0 +1,244 @@
+/* SecureVault Chrome Extension - Content Script Styles */
+/* Styles for the save password popup injected into websites */
+
+#securevault-save-popup {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2147483647;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+#securevault-save-popup.sv-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.sv-popup-content {
+  width: 360px;
+  background: linear-gradient(135deg, #12121a 0%, #1a1a2e 100%);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 16px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(99, 102, 241, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.sv-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(100, 100, 150, 0.2);
+}
+
+.sv-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.sv-popup-title {
+  flex: 1;
+}
+
+.sv-popup-title h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.3;
+}
+
+.sv-popup-title span {
+  font-size: 12px;
+  color: #a0a0b0;
+}
+
+.sv-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(100, 100, 150, 0.2);
+  color: #a0a0b0;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.sv-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.sv-popup-body {
+  padding: 16px 20px;
+}
+
+.sv-credential-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sv-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sv-label {
+  font-size: 12px;
+  color: #6b6b80;
+  font-weight: 500;
+}
+
+.sv-value {
+  font-size: 13px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 10px;
+  border-radius: 6px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sv-popup-actions {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid rgba(100, 100, 150, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sv-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  font-family: inherit;
+}
+
+.sv-btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+}
+
+.sv-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 16px rgba(99, 102, 241, 0.3);
+}
+
+.sv-btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: #a0a0b0;
+  border: 1px solid rgba(100, 100, 150, 0.2);
+}
+
+.sv-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(100, 100, 150, 0.4);
+}
+
+/* Notification Toast */
+.sv-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #12121a 0%, #1a1a2e 100%);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 12px;
+  box-shadow: 
+    0 15px 40px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(99, 102, 241, 0.1);
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.sv-notification.sv-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+.sv-notif-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+/* Dark mode detection - adjust colors if on light page */
+@media (prefers-color-scheme: light) {
+  .sv-popup-content,
+  .sv-notification {
+    box-shadow: 
+      0 20px 60px rgba(0, 0, 0, 0.25),
+      0 0 40px rgba(99, 102, 241, 0.1);
+  }
+}
+
+/* Animation for popup entrance */
+@keyframes sv-popup-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Pulse animation for the save button */
+.sv-btn-primary {
+  animation: sv-pulse 2s infinite;
+}
+
+@keyframes sv-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+  }
+}
