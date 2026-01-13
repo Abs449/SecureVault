@@ -55,7 +55,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
+    <main className="min-h-screen w-full flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md animate-slide-in">
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold mb-3">

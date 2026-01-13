@@ -95,7 +95,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-start justify-center p-8 md:p-12">
+    <main className="min-h-screen w-full flex flex-col items-center justify-start p-8 md:p-12">
       <div className="w-full max-w-6xl">
         {/* Header */}
         <div className="mb-12 animate-slide-in">

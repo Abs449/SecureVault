@@ -1,5 +1,5 @@
-window.firebaseConfig = {
-  apiKey: "AIzaSyDwuleRG0MI7EETi5j0rgBjsNxrItKUjUA",
+﻿window.firebaseConfig = {
+  apiKey: "AIzaSyAOn7WQbeLeJ-MVZ-s0OEyDvSFfxULQLt8",
   authDomain: "passwordmanager-42b9a.firebaseapp.com",
   projectId: "passwordmanager-42b9a",
   storageBucket: "passwordmanager-42b9a.firebasestorage.app",
