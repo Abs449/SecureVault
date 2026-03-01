@@ -42,6 +42,22 @@ A secure password manager built with Next.js, TypeScript, and Firebase, featurin
 - **HTTPS Required**: Use HTTPS in production to prevent MITM attacks
 - **No Data in Storage**: Encryption key stays in memory only, never in localStorage
 
+---
+
+### 🔧 Local Setup & Secrets
+
+The Chrome extension and Next.js app require your Firebase configuration at build time.
+
+1. Copy `env.example` to `.env.local` and populate with your own Firebase project's
+   values (you can regenerate a key in the Firebase console if you exposed one).
+2. Install dependencies including `dotenv` (already included in `devDependencies`).
+3. `npm run build` will call `node scripts/generate-extension-config.js`, which reads
+   the `.env*` file and writes `extension/config.js` automatically.
+4. Both `.env.local` and `extension/config.js` are ignored by Git; do **not** commit them.
+
+> The extension loads `window.firebaseConfig` from that generated file. Rotating or
+> restricting your API key in the Firebase console prevents misuse even if a key leaks.
+
 ## 🎨 Features
 
 - ✅ Secure password storage with client-side encryption

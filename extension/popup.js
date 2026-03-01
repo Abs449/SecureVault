@@ -1,9 +1,11 @@
 // SecureVault Chrome Extension - Popup Script
 // Handles authentication, vault management, and password CRUD operations
 
-// Firebase configuration - Loaded from config.js
-// If you are setting this up from GitHub, create a copy of config.example.js
-// as config.js and add your credentials there.
+// Firebase configuration - Loaded from config.js which is generated at build time.
+// Do **not** commit your real credentials. Instead populate environment variables
+// in `.env.local` and run `npm run build` (the prebuild script will invoke
+// scripts/generate-extension-config.js to create this file).
+// `extension/config.js` is gitignored and will be overwritten on each build.
 const firebaseConfig = window.firebaseConfig;
 
 // ==================== CRYPTO MODULE ====================
