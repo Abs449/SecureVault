@@ -46,17 +46,21 @@ A secure password manager built with Next.js, TypeScript, and Firebase, featurin
 
 ### 🔧 Local Setup & Secrets
 
-The Chrome extension and Next.js app require your Firebase configuration at build time.
+The Chrome extension and Next.js app rely on a Firebase configuration that must
+never be committed to the repository. A small build‑time script generates the
+needed `extension/config.js` from environment variables.
 
-1. Copy `env.example` to `.env.local` and populate with your own Firebase project's
-   values (you can regenerate a key in the Firebase console if you exposed one).
-2. Install dependencies including `dotenv` (already included in `devDependencies`).
-3. `npm run build` will call `node scripts/generate-extension-config.js`, which reads
-   the `.env*` file and writes `extension/config.js` automatically.
-4. Both `.env.local` and `extension/config.js` are ignored by Git; do **not** commit them.
+1. Copy `env.example` to `.env.local` and fill in your own Firebase project
+   values. Rotate or restrict your API key in the Firebase console if it was
+   previously leaked.
+2. Ensure `dotenv` is installed (`npm install` will pull it in since it's a
+   dev dependency). It’s used by `scripts/generate-extension-config.js`.
+3. Run `npm run build`; the `prebuild` step invokes the script and writes
+   `extension/config.js` from your `.env.local` file. The file is gitignored.
+4. Do not commit `.env.local` or `extension/config.js` – they contain secrets.
 
-> The extension loads `window.firebaseConfig` from that generated file. Rotating or
-> restricting your API key in the Firebase console prevents misuse even if a key leaks.
+> After rebuilding, the extension loads `window.firebaseConfig` from the
+> generated file. Any exposed key becomes harmless if rotated/restricted.
 
 ## 🎨 Features
 
