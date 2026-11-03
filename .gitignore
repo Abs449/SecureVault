@@ -39,7 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-# extension config
-extension/config.js
+# extension build output
+/dist/
 # env file
 .env.local

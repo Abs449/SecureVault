@@ -2,88 +2,44 @@ import { auth, db } from './firebase';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut as firebaseSignOut
+  signOut as firebaseSignOut,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { generateSalt, saltToBase64 } from './crypto';
-import { CryptoConfig } from './types';
+import { initializeVault } from './vault';
+import { friendlyAuthError } from './errors';
+
+function requireFirebase() {
+  if (!auth || !db) {
+    throw new Error('Firebase is not configured. Check the NEXT_PUBLIC_FIREBASE_* variables in .env.local.');
+  }
+  return { auth, db };
+}
 
 /**
- * Sign up a new user with email, account password, and master password.
- * @param email - User's email
- * @param accountPassword - Password for Firebase Auth
- * @param masterPassword - Password for client-side encryption (not sent to Firebase Auth)
+ * Create an account and initialize its encrypted vault.
+ * The master password never leaves the device; only a salt and a key-check value are stored.
  */
 export async function signUp(email: string, accountPassword: string, masterPassword: string): Promise<void> {
-  if (!auth || !db) {
-    throw new Error('Firebase Auth or Firestore is not initialized. Please configure environment variables.');
-  }
+  const { auth, db } = requireFirebase();
   try {
-    // 1. Create user in Firebase Auth using the account password
-    const userCredential = await createUserWithEmailAndPassword(auth, email, accountPassword);
-    const userId = userCredential.user.uid;
-
-    // 2. Generate a random salt for this user
-    const saltBuffer = generateSalt();
-    const salt = saltToBase64(saltBuffer);
-
-    // 3. Store the salt and crypto configuration in Firestore
-    // This salt is needed to derive the same key from the master password later.
-    const config: CryptoConfig = {
-      salt
-    };
-
-    await setDoc(doc(db, 'users', userId, 'config', 'crypto'), config);
-
-    // Create base collection for passwords
-    // Firestore creates collections implicitly when the first document is added.
-  } catch (error: any) {
-    console.error('Sign up error:', error);
-    throw new Error(error.message || 'Failed to sign up');
+    const { user } = await createUserWithEmailAndPassword(auth, email, accountPassword);
+    await initializeVault(db, user.uid, masterPassword);
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
   }
 }
 
-/**
- * Sign in an existing user and retrieve their salt.
- * @param email - User's email
- * @param accountPassword - Password for Firebase Auth
- * @returns The user's unique salt for key derivation
- */
+/** Authenticate with the account password. Returns the signed-in user's uid. */
 export async function signIn(email: string, accountPassword: string): Promise<string> {
-  if (!auth || !db) {
-    throw new Error('Firebase Auth or Firestore is not initialized. Please configure environment variables.');
-  }
+  const { auth } = requireFirebase();
   try {
-    // 1. Sign in with Firebase Auth using the account password
-    const userCredential = await signInWithEmailAndPassword(auth, email, accountPassword);
-    const userId = userCredential.user.uid;
-
-    // 2. Retrieve the user's salt from Firestore
-    const configDoc = await getDoc(doc(db, 'users', userId, 'config', 'crypto'));
-
-    if (!configDoc.exists()) {
-      throw new Error('User configuration not found. Potential data corruption.');
-    }
-
-    const config = configDoc.data() as CryptoConfig;
-    return config.salt;
-  } catch (error: any) {
-    console.error('Sign in error:', error);
-    throw new Error(error.message || 'Failed to sign in');
+    const { user } = await signInWithEmailAndPassword(auth, email, accountPassword);
+    return user.uid;
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
   }
 }
 
-/**
- * Sign out the current user.
- */
 export async function signOut(): Promise<void> {
-  if (!auth) {
-    throw new Error('Firebase Auth is not initialized. Please configure environment variables.');
-  }
-  try {
-    await firebaseSignOut(auth);
-  } catch (error: any) {
-    console.error('Sign out error:', error);
-    throw new Error(error.message || 'Failed to sign out');
-  }
+  const { auth } = requireFirebase();
+  await firebaseSignOut(auth);
 }

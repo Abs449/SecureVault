@@ -31,6 +31,7 @@ export interface PasswordData {
 
 export interface CryptoConfig {
   salt: string; // Base64 encoded salt for PBKDF2
+  verifier?: EncryptedResult; // Known value encrypted with the vault key, used to check the master password
 }
 
 export interface User {

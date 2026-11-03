@@ -46,21 +46,27 @@ A secure password manager built with Next.js, TypeScript, and Firebase, featurin
 
 ### 🔧 Local Setup & Secrets
 
-The Chrome extension and Next.js app rely on a Firebase configuration that must
-never be committed to the repository. A small build‑time script generates the
-needed `extension/config.js` from environment variables.
+1. Copy `env.example` to `.env.local` and fill in your Firebase project values
+   (`NEXT_PUBLIC_FIREBASE_*`). Never commit `.env.local`.
+2. `npm install`
+3. Web app: `npm run dev` (or `npm run build` for the static export in `out/`).
 
-1. Copy `env.example` to `.env.local` and fill in your own Firebase project
-   values. Rotate or restrict your API key in the Firebase console if it was
-   previously leaked.
-2. Ensure `dotenv` is installed (`npm install` will pull it in since it's a
-   dev dependency). It’s used by `scripts/generate-extension-config.js`.
-3. Run `npm run build`; the `prebuild` step invokes the script and writes
-   `extension/config.js` from your `.env.local` file. The file is gitignored.
-4. Do not commit `.env.local` or `extension/config.js` – they contain secrets.
+### 🧩 Chrome extension
 
-> After rebuilding, the extension loads `window.firebaseConfig` from the
-> generated file. Any exposed key becomes harmless if rotated/restricted.
+The extension shares its vault and crypto code with the web app (`src/lib/vault.ts`,
+`src/lib/crypto.ts`), so both read and write the same encrypted data.
+
+1. `npm run build:extension` bundles everything into `dist/extension`. The Firebase
+   values from `.env.local` are compiled in, so there's no separate config file.
+2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**,
+   and choose `dist/extension`.
+3. While developing, `npm run dev:extension` rebuilds on change. Press the reload
+   button on the extension card to pick up changes.
+
+Create your account in the web app first, then sign in to the extension with
+the same email, account password and master password.
+
+The extension icons come from `assets/logo.svg`. Run `npm run icons` after changing the logo.
 
 ## 🎨 Features
 
@@ -72,13 +78,14 @@ needed `extension/config.js` from environment variables.
 - ✅ Show/hide password toggle
 - ✅ Auto-lock after inactivity
 - ✅ Password strength indicator
-- ✅ Responsive design with glassmorphism UI
+- ✅ Light and dark themes that follow the system setting
+- ✅ Chrome extension: fill logins, save new ones, generate passwords from the context menu
 
 ## 🧪 Technology Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
-- **Styling**: Custom CSS with Tailwind
+- **Styling**: Tailwind CSS v4, Lucide icons, IBM Plex
 - **Authentication**: Firebase Auth
 - **Database**: Cloud Firestore
 - **Encryption**: Web Crypto API (AES-256-CBC, PBKDF2)

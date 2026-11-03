@@ -17,13 +17,11 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Without a configured Firebase there is nothing to wait for.
+  const [loading, setLoading] = useState(() => Boolean(auth));
 
   useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
+    if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
@@ -37,15 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    // Safety timeout for loading state (e.g. extension environment delays)
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
-
-    return () => {
-      unsubscribe();
-      clearTimeout(timeout);
-    };
+    return unsubscribe;
   }, []);
 
   return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>;

@@ -1,163 +1,98 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { generatePassword, calculatePasswordStrength } from '@/lib/crypto';
+import { useMemo, useState } from 'react';
+import { Check, Copy, RefreshCw } from 'lucide-react';
+import { generatePassword } from '@/lib/crypto';
 import { PasswordGeneratorOptions } from '@/lib/types';
+import { StrengthMeter } from './ui';
 
-interface PasswordGeneratorProps {
-  onUsePassword: (password: string) => void;
-}
+type CharsetKey = keyof Omit<PasswordGeneratorOptions, 'length'>;
 
-export default function PasswordGenerator({ onUsePassword }: PasswordGeneratorProps) {
-  const [length, setLength] = useState(16);
+const CHARSETS: { key: CharsetKey; label: string }[] = [
+  { key: 'includeUppercase', label: 'A–Z' },
+  { key: 'includeLowercase', label: 'a–z' },
+  { key: 'includeNumbers', label: '0–9' },
+  { key: 'includeSymbols', label: '!@#' },
+];
+
+export default function PasswordGenerator({ onUsePassword }: { onUsePassword: (password: string) => void }) {
   const [options, setOptions] = useState<PasswordGeneratorOptions>({
-    length: 16,
+    length: 20,
     includeUppercase: true,
     includeLowercase: true,
     includeNumbers: true,
     includeSymbols: true,
   });
-  const [refreshCount, setRefreshCount] = useState(0);
+  const [seed, setSeed] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  // Derive password from options and length
-  // We use useMemo to avoid re-generating on every render, but allow manual refresh
-  const generatedPassword = useMemo(() => {
+  const password = useMemo(() => {
     try {
-      return generatePassword({ ...options, length });
-    } catch (error) {
-      console.error('Failed to generate password:', error);
+      return generatePassword(options);
+    } catch {
       return '';
     }
-    // refreshCount is intentionally included to trigger manual regeneration
+    // `seed` forces a fresh password when "Regenerate" is pressed
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options, length, refreshCount]);
-  // Derive strength from the generated password
-  const strength = useMemo(() => calculatePasswordStrength(generatedPassword), [generatedPassword]);
+  }, [options, seed]);
 
-  const handleRegenerate = () => {
-    setRefreshCount((prev) => prev + 1);
-    setCopied(false);
+  const toggle = (key: CharsetKey) => {
+    const enabled = CHARSETS.filter((c) => options[c.key]).length;
+    if (options[key] && enabled === 1) return; // keep at least one character set
+    setOptions((o) => ({ ...o, [key]: !o[key] }));
   };
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedPassword);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy:', error);
-    }
-  };
-
-  const toggleOption = (key: keyof Omit<PasswordGeneratorOptions, 'length'>) => {
-    setOptions((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const getStrengthLabel = () => {
-    if (strength < 40) return { text: 'Weak', color: 'text-red-400', barClass: 'strength-weak' };
-    if (strength < 70) return { text: 'Medium', color: 'text-yellow-400', barClass: 'strength-medium' };
-    return { text: 'Strong', color: 'text-green-400', barClass: 'strength-strong' };
-  };
-
-  const strengthInfo = getStrengthLabel();
 
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-2">Generated Password</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={generatedPassword}
-            readOnly
-            className="input font-mono text-sm flex-1"
-          />
-          <button onClick={handleCopy} className="btn btn-secondary px-3" title="Copy">
-            {copied ? '✓' : '📋'}
+        <div className="flex items-center gap-1 rounded-lg border border-border-strong bg-surface py-1 pl-3 pr-1">
+          <code className="min-w-0 flex-1 break-all font-mono text-[13px] leading-6">{password}</code>
+          <button
+            type="button"
+            className="icon-btn"
+            title="Copy"
+            aria-label="Copy generated password"
+            onClick={async () => {
+              await navigator.clipboard.writeText(password);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+          >
+            {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
           </button>
-          <button onClick={handleRegenerate} className="btn btn-secondary px-3" title="Regenerate">
-            🔄
+          <button type="button" className="icon-btn" title="Regenerate" aria-label="Regenerate" onClick={() => setSeed((s) => s + 1)}>
+            <RefreshCw size={16} />
           </button>
         </div>
-
-        {/* Strength indicator */}
-        <div className="mt-2">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-xs text-text-secondary">Strength:</span>
-            <span className={`text-xs font-medium ${strengthInfo.color}`}>
-              {strengthInfo.text}
-            </span>
-          </div>
-          <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
-            <div className={`strength-bar ${strengthInfo.barClass}`} />
-          </div>
-        </div>
+        <StrengthMeter password={password} />
       </div>
 
-      {/* Length slider */}
       <div>
-        <label>Length: {length}</label>
+        <div className="mb-1 flex items-center justify-between text-[13px]">
+          <label htmlFor="gen-length" className="font-medium">Length</label>
+          <span className="font-mono tabular-nums text-fg-muted">{options.length}</span>
+        </div>
         <input
+          id="gen-length"
           type="range"
-          min="8"
-          max="64"
-          value={length}
-          onChange={(e) => setLength(Number(e.target.value))}
-          className="w-full accent-accent-primary"
+          min={8}
+          max={64}
+          value={options.length}
+          onChange={(e) => setOptions((o) => ({ ...o, length: Number(e.target.value) }))}
+          className="range"
         />
       </div>
 
-      {/* Options */}
-      <div className="space-y-2">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={options.includeUppercase}
-            onChange={() => toggleOption('includeUppercase')}
-            className="mr-2 accent-accent-primary"
-          />
-          <span className="text-sm">Uppercase (A-Z)</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={options.includeLowercase}
-            onChange={() => toggleOption('includeLowercase')}
-            className="mr-2 accent-accent-primary"
-          />
-          <span className="text-sm">Lowercase (a-z)</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={options.includeNumbers}
-            onChange={() => toggleOption('includeNumbers')}
-            className="mr-2 accent-accent-primary"
-          />
-          <span className="text-sm">Numbers (0-9)</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={options.includeSymbols}
-            onChange={() => toggleOption('includeSymbols')}
-            className="mr-2 accent-accent-primary"
-          />
-          <span className="text-sm">Symbols (!@#$...)</span>
-        </label>
+      <div className="flex flex-wrap items-center gap-2">
+        {CHARSETS.map(({ key, label }) => (
+          <button key={key} type="button" className="chip font-mono" aria-pressed={options[key]} onClick={() => toggle(key)}>
+            {label}
+          </button>
+        ))}
+        <button type="button" onClick={() => onUsePassword(password)} className="btn btn-primary btn-sm ml-auto">
+          Use password
+        </button>
       </div>
-
-      {/* Use password button */}
-      <button
-        onClick={() => onUsePassword(generatedPassword)}
-        className="btn btn-primary w-full"
-      >
-        Use This Password
-      </button>
     </div>
   );
 }

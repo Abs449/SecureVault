@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useVault } from '@/context/VaultContext';
-import { signIn } from '@/lib/auth';
+import { signOut } from '@/lib/auth';
+import { ErrorAlert, PasswordInput } from './ui';
+import { LogoMark } from './Logo';
 
 export default function LockScreen() {
   const router = useRouter();
@@ -19,94 +21,61 @@ export default function LockScreen() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      if (!user?.email) {
-        throw new Error('No user found');
-      }
-
-      // Get salt (we need to sign in again to get the salt)
-      // In a production app, you might cache the salt
-      const salt = await signIn(user.email, ''); // This will fail but we catch it
-    } catch (err: any) {
-      // For unlocking, we actually need to retrieve the salt differently
-      // Let's implement a simpler approach using localStorage temporarily
-
-      try {
-        // Get the user's salt from Firestore directly
-        const { getDoc, doc } = await import('firebase/firestore');
-        const { db } = await import('@/lib/firebase');
-        
-        if (!db) {
-          throw new Error('Database is not initialized. Please configure environment variables.');
-        }
-        if (!user) throw new Error('Not authenticated');
-
-        const configDoc = await getDoc(doc(db, 'users', user.uid, 'config', 'crypto'));
-        if (!configDoc.exists()) {
-          throw new Error('Configuration not found');
-        }
-
-        const config = configDoc.data();
-        await unlockVault(masterPassword, config.salt);
-      } catch (unlockError: any) {
-        setError(unlockError.message || 'Invalid master password');
-      }
+      await unlockVault(masterPassword);
+    } catch (err) {
+      setError((err as Error).message);
+      setMasterPassword('');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut().catch((err) => console.error('Failed to sign out:', err));
+    router.replace('/');
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md animate-slide-in">
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🔒</div>
-          <h1 className="text-3xl font-bold mb-2">Vault Locked</h1>
-          <p className="text-text-secondary">
-            Enter your master password to unlock
-          </p>
+    <div className="flex min-h-screen items-start justify-center px-4 pt-[18vh]">
+      <div className="w-full max-w-[360px]">
+        <div className="flex flex-col items-center text-center">
+          <LogoMark size={44} />
+          <h1 className="mt-5 text-xl font-semibold tracking-tight">Your vault is locked</h1>
+          {user?.email && <p className="mt-1 text-sm text-fg-muted">{user.email}</p>}
         </div>
 
-        <div className="glass p-8">
-          <form onSubmit={handleUnlock} className="space-y-4">
-            <div>
-              <label htmlFor="masterPassword">Master Password</label>
-              <input
-                id="masterPassword"
-                type="password"
-                className="input"
-                placeholder="Enter your master password"
-                value={masterPassword}
-                onChange={(e) => setMasterPassword(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-
-            {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                {error}
-              </div>
-            )}
-
-            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <div className="spinner" />
-                  Unlocking...
-                </>
-              ) : (
-                '🔓 Unlock Vault'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-xs text-text-secondary">
-              Auto-locked after 15 minutes of inactivity
-            </p>
+        <form onSubmit={handleUnlock} className="mt-8 space-y-4">
+          <div>
+            <label htmlFor="masterPassword" className="field-label">Master password</label>
+            <PasswordInput
+              id="masterPassword"
+              autoComplete="off"
+              value={masterPassword}
+              onChange={(e) => setMasterPassword(e.target.value)}
+              required
+              autoFocus
+            />
           </div>
+
+          {error && <ErrorAlert>{error}</ErrorAlert>}
+
+          <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+            {loading ? (
+              <>
+                <span className="spinner" />
+                Unlocking…
+              </>
+            ) : (
+              'Unlock'
+            )}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center text-sm">
+          <button onClick={handleSignOut} className="text-fg-muted hover:text-fg">
+            Sign in with a different account
+          </button>
         </div>
       </div>
     </div>

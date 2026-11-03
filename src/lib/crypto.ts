@@ -24,7 +24,8 @@ export function generateSalt(): Uint8Array {
  */
 export async function deriveKey(
   masterPassword: string,
-  salt: Uint8Array
+  salt: Uint8Array,
+  extractable = false
 ): Promise<CryptoKey> {
   // Import the password as a key
   const passwordKey = await crypto.subtle.importKey(
@@ -45,7 +46,9 @@ export async function deriveKey(
     },
     passwordKey,
     { name: 'AES-CBC', length: KEY_LENGTH },
-    false, // Not extractable - key stays in Web Crypto API
+    // Not extractable by default, so the key stays inside Web Crypto. The browser extension
+    // opts in so it can keep the key in memory-only session storage between popup openings.
+    extractable,
     ['encrypt', 'decrypt']
   );
 
@@ -102,9 +105,40 @@ export async function decrypt(
     );
 
     return new TextDecoder().decode(decryptedBuffer);
-  } catch (error) {
+  } catch {
     throw new Error('Decryption failed. Invalid master password or corrupted data.');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Master password verification
+// A known constant is encrypted with the vault key at sign-up. Unlocking decrypts it first,
+// so a wrong master password is rejected even when the vault has no entries yet.
+// ---------------------------------------------------------------------------
+const VERIFIER_PLAINTEXT = 'securevault:key-check:v1';
+
+export async function createVerifier(key: CryptoKey): Promise<EncryptedResult> {
+  return encrypt(VERIFIER_PLAINTEXT, key);
+}
+
+export async function checkVerifier(verifier: EncryptedResult, key: CryptoKey): Promise<boolean> {
+  try {
+    return (await decrypt(verifier.data, verifier.iv, key)) === VERIFIER_PLAINTEXT;
+  } catch {
+    return false;
+  }
+}
+
+/** Serialize an (extractable) key so it can be held in extension session storage. */
+export async function exportKey(key: CryptoKey): Promise<string> {
+  return arrayBufferToBase64(await crypto.subtle.exportKey('raw', key));
+}
+
+export async function importKey(raw: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', base64ToArrayBuffer(raw), { name: 'AES-CBC' }, true, [
+    'encrypt',
+    'decrypt',
+  ]);
 }
 
 /**
@@ -130,11 +164,14 @@ export function generatePassword(options: PasswordGeneratorOptions): string {
     throw new Error('At least one character type must be selected');
   }
 
-  // Use crypto.getRandomValues for cryptographically secure randomness
-  const password = Array.from(crypto.getRandomValues(new Uint32Array(length)))
-    .map((x) => charset[x % charset.length])
-    .join('');
-
+  // Rejection sampling avoids the modulo bias of `x % charset.length`
+  const limit = Math.floor(0x100000000 / charset.length) * charset.length;
+  let password = '';
+  while (password.length < length) {
+    for (const x of crypto.getRandomValues(new Uint32Array(length))) {
+      if (x < limit && password.length < length) password += charset[x % charset.length];
+    }
+  }
   return password;
 }
 

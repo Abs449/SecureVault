@@ -1,235 +1,156 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useVault } from '@/context/VaultContext';
 import { signUp } from '@/lib/auth';
-import { validateMasterPassword, calculatePasswordStrength } from '@/lib/crypto';
-import Link from 'next/link';
+import { validateMasterPassword } from '@/lib/crypto';
+import AuthShell from '@/components/AuthShell';
+import { ErrorAlert, FullPageSpinner, PasswordInput, StrengthMeter } from '@/components/ui';
+import { TriangleAlert } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { unlockVault } = useVault();
 
   const [email, setEmail] = useState('');
   const [accountPassword, setAccountPassword] = useState('');
   const [masterPassword, setMasterPassword] = useState('');
   const [confirmMasterPassword, setConfirmMasterPassword] = useState('');
+  const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState(0);
-  const [showWarning, setShowWarning] = useState(false);
+  const submitting = useRef(false);
 
-  // Redirect if already authenticated
   useEffect(() => {
-    if (!authLoading && user) {
-      router.push('/dashboard');
-    }
+    if (!authLoading && user && !submitting.current) router.replace('/dashboard');
   }, [user, authLoading, router]);
 
-  // Calculate password strength
-  useEffect(() => {
-    if (masterPassword) {
-      setPasswordStrength(calculatePasswordStrength(masterPassword));
-    } else {
-      setPasswordStrength(0);
-    }
-  }, [masterPassword]);
+  const mismatch = confirmMasterPassword.length > 0 && confirmMasterPassword !== masterPassword;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validate master password
     const validation = validateMasterPassword(masterPassword);
-    if (!validation.valid) {
-      setError(validation.error || 'Invalid master password');
-      return;
+    if (!validation.valid) return setError(validation.error ?? 'Choose a stronger master password.');
+    if (masterPassword !== confirmMasterPassword) return setError('Master passwords do not match.');
+    if (masterPassword === accountPassword) {
+      return setError('Use a master password that is different from your account password.');
     }
-
-    // Check if master passwords match
-    if (masterPassword !== confirmMasterPassword) {
-      setError('Master passwords do not match');
-      return;
-    }
-
-    // Show warning if not acknowledged
-    if (!showWarning) {
-      setShowWarning(true);
-      return;
-    }
+    if (!acknowledged) return setError('Confirm that you understand the master password cannot be recovered.');
 
     setLoading(true);
-
+    submitting.current = true;
     try {
       await signUp(email, accountPassword, masterPassword);
-      router.push('/');
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign up');
-    } finally {
+      await unlockVault(masterPassword);
+      router.replace('/dashboard');
+    } catch (err) {
+      setError((err as Error).message);
       setLoading(false);
+      submitting.current = false;
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner" />
-      </div>
-    );
-  }
-
-  const getStrengthLabel = () => {
-    if (passwordStrength < 40) return { text: 'Weak', class: 'strength-weak' };
-    if (passwordStrength < 70) return { text: 'Medium', class: 'strength-medium' };
-    return { text: 'Strong', class: 'strength-strong' };
-  };
-
-  const strength = getStrengthLabel();
+  if (authLoading) return <FullPageSpinner />;
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md animate-slide-in">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold mb-3">
-            <span className="gradient-text">SecureVault</span>
-          </h1>
-          <p className="text-text-secondary text-lg">Create Your Account</p>
+    <AuthShell
+      title="Create your vault"
+      subtitle="You'll use two passwords: one to sign in, one to encrypt."
+      aside={{ prompt: 'Already have an account?', href: '/', label: 'Sign in' }}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="field-label">Email</label>
+          <input
+            id="email"
+            type="email"
+            className="input"
+            autoComplete="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoFocus
+          />
         </div>
 
-        <div className="glass p-8">
-          <h2 className="text-2xl font-semibold mb-6">Sign Up</h2>
+        <div>
+          <label htmlFor="accountPassword" className="field-label">Account password</label>
+          <PasswordInput
+            id="accountPassword"
+            autoComplete="new-password"
+            value={accountPassword}
+            onChange={(e) => setAccountPassword(e.target.value)}
+            required
+            minLength={6}
+          />
+          <p className="field-hint">At least 6 characters. Used to sign in.</p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email">Email</label>
-              <input
-                id="email"
-                type="email"
-                className="input"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="accountPassword">Account Password</label>
-              <input
-                id="accountPassword"
-                type="password"
-                className="input"
-                placeholder="Choose an account password"
-                value={accountPassword}
-                onChange={(e) => setAccountPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-              <p className="text-xs text-text-secondary mt-1">
-                For authentication only (min 6 characters)
-              </p>
-            </div>
-
-            <div>
-              <label htmlFor="masterPassword">Master Password</label>
-              <input
-                id="masterPassword"
-                type="password"
-                className="input"
-                placeholder="Choose a strong master password"
-                value={masterPassword}
-                onChange={(e) => setMasterPassword(e.target.value)}
-                required
-              />
-              {masterPassword && (
-                <div className="mt-2">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-text-secondary">Strength:</span>
-                    <span className={`text-xs font-medium ${
-                      strength.class === 'strength-weak' ? 'text-red-400' :
-                      strength.class === 'strength-medium' ? 'text-yellow-400' :
-                      'text-green-400'
-                    }`}>
-                      {strength.text}
-                    </span>
-                  </div>
-                  <div className="strength-bar-container h-1 bg-gray-700 rounded-full overflow-hidden">
-                    <div className={`strength-bar ${strength.class}`} />
-                  </div>
-                </div>
-              )}
-              <p className="text-xs text-text-secondary mt-2">
-                Min 12 characters, with uppercase, lowercase, numbers, and symbols
-              </p>
-            </div>
-
-            <div>
-              <label htmlFor="confirmMasterPassword">Confirm Master Password</label>
-              <input
-                id="confirmMasterPassword"
-                type="password"
-                className="input"
-                placeholder="Re-enter master password"
-                value={confirmMasterPassword}
-                onChange={(e) => setConfirmMasterPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            {showWarning && (
-              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                <h3 className="text-amber-400 font-semibold mb-2">⚠️ Important Warning</h3>
-                <p className="text-sm text-text-secondary mb-3">
-                  Your master password cannot be recovered if forgotten. All your data will be
-                  permanently lost. Make sure you remember it or store it securely.
-                </p>
-                <label className="flex items-center text-sm">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    required
-                  />
-                  <span>I understand and accept this risk</span>
-                </label>
-              </div>
+        <div className="space-y-4 border-t border-border pt-4">
+          <div>
+            <label htmlFor="masterPassword" className="field-label">Master password</label>
+            <PasswordInput
+              id="masterPassword"
+              autoComplete="new-password"
+              value={masterPassword}
+              onChange={(e) => setMasterPassword(e.target.value)}
+              required
+            />
+            {masterPassword ? (
+              <StrengthMeter password={masterPassword} />
+            ) : (
+              <p className="field-hint">12+ characters, mixing upper and lower case, numbers and symbols.</p>
             )}
+          </div>
 
-            {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                {error}
-              </div>
-            )}
-
-            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <div className="spinner" />
-                  Creating Account...
-                </>
-              ) : showWarning ? (
-                'Create Account'
-              ) : (
-                'Continue'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm">
-            <p className="text-text-secondary">
-              Already have an account?{' '}
-              <Link href="/" className="text-accent-primary hover:text-accent-secondary">
-                Sign In
-              </Link>
-            </p>
+          <div>
+            <label htmlFor="confirmMasterPassword" className="field-label">Confirm master password</label>
+            <PasswordInput
+              id="confirmMasterPassword"
+              autoComplete="new-password"
+              value={confirmMasterPassword}
+              onChange={(e) => setConfirmMasterPassword(e.target.value)}
+              aria-invalid={mismatch}
+              required
+            />
+            {mismatch && <p className="field-hint text-danger">Doesn&apos;t match the master password.</p>}
           </div>
         </div>
 
-        <div className="mt-6 p-4 glass text-center text-xs text-text-secondary">
-          <p className="mb-2">🔒 Zero-Knowledge Architecture</p>
-          <p>Your data is encrypted locally before being stored</p>
-        </div>
-      </div>
-    </main>
+        <label className="flex cursor-pointer gap-3 rounded-lg border border-border bg-surface-muted p-3 text-sm">
+          <input
+            type="checkbox"
+            className="checkbox mt-0.5 shrink-0"
+            checked={acknowledged}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+          />
+          <span className="text-fg-muted">
+            <span className="mb-0.5 flex items-center gap-1.5 font-medium text-fg">
+              <TriangleAlert size={14} className="text-warning" aria-hidden />
+              The master password can&apos;t be reset
+            </span>
+            We never receive it, so if you forget it your vault can&apos;t be decrypted by anyone.
+          </span>
+        </label>
+
+        {error && <ErrorAlert>{error}</ErrorAlert>}
+
+        <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+          {loading ? (
+            <>
+              <span className="spinner" />
+              Creating vault…
+            </>
+          ) : (
+            'Create account'
+          )}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

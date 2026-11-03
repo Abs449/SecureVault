@@ -1,5 +1,6 @@
 'use client';
- 
+
+// Rendered outside the root layout, so it can't rely on globals.css — styles are inline.
 export default function GlobalError({
   error,
   reset,
@@ -8,16 +9,50 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <html>
-      <body className="h-screen w-screen flex items-center justify-center bg-gray-50 text-gray-900">
-        <div className="text-center p-10">
-          <h2 className="text-3xl font-bold mb-4">Critical Error</h2>
-          <p className="mb-6 text-gray-600">The application encountered a critical error and cannot continue.</p>
+    <html lang="en">
+      <body
+        style={{
+          margin: 0,
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16,
+          background: '#f6f7f9',
+          color: '#0f172a',
+          fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 420,
+            width: '100%',
+            textAlign: 'center',
+            background: '#fff',
+            border: '1px solid #e3e6eb',
+            borderRadius: 12,
+            padding: 32,
+          }}
+        >
+          <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Critical error</h2>
+          <p style={{ color: '#5b6577', fontSize: 14, margin: '8px 0 24px' }}>
+            SecureVault ran into a problem it couldn&apos;t recover from. Your vault data is safe.
+          </p>
           <button
             onClick={() => reset()}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+            style={{
+              background: '#1d4ed8',
+              color: '#fff',
+              border: 0,
+              borderRadius: 8,
+              height: 40,
+              padding: '0 18px',
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
           >
-            Restart Application
+            Restart application
           </button>
         </div>
       </body>
