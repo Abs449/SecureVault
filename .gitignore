@@ -41,5 +41,6 @@ yarn-error.log*
 next-env.d.ts
 # extension build output
 /dist/
+/public/downloads/
 # env file
 .env.local

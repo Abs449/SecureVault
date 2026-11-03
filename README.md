@@ -46,27 +46,35 @@ A secure password manager built with Next.js, TypeScript, and Firebase, featurin
 
 ### 🔧 Local Setup & Secrets
 
-1. Copy `env.example` to `.env.local` and fill in your Firebase project values
-   (`NEXT_PUBLIC_FIREBASE_*`). Never commit `.env.local`.
-2. `npm install`
-3. Web app: `npm run dev` (or `npm run build` for the static export in `out/`).
+1. Create `.env.local` with your Firebase web config (`NEXT_PUBLIC_FIREBASE_API_KEY`,
+   `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`, `_APP_ID`).
+   These values are not secrets (they ship to every browser), but keep the file out of git
+   and restrict the API key in Google Cloud Console → Credentials.
+2. In the Firebase console, enable **Authentication → Email/Password** and create a
+   **Firestore** database.
+3. `npm install`, then `npm run dev`. This also builds the extension, so the download
+   on `/extension` works locally.
+
+### 🛡️ Backend
+
+- `npm run deploy:rules` deploys [firestore.rules](firestore.rules). Run
+  `npx firebase-tools login` first. The rules restrict each user to their own data,
+  validate document shapes, and stop the encryption salt from being overwritten.
+- `npm run test:backend` runs an end-to-end check against the project in `.env.local`. It
+  creates a throwaway account, exercises sign-up, unlock, add/edit/delete and the security
+  rules, then deletes everything it created.
 
 ### 🧩 Chrome extension
 
 The extension shares its vault and crypto code with the web app (`src/lib/vault.ts`,
 `src/lib/crypto.ts`), so both read and write the same encrypted data.
 
-1. `npm run build:extension` bundles everything into `dist/extension`. The Firebase
-   values from `.env.local` are compiled in, so there's no separate config file.
-2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**,
-   and choose `dist/extension`.
-3. While developing, `npm run dev:extension` rebuilds on change. Press the reload
-   button on the extension card to pick up changes.
-
-Create your account in the web app first, then sign in to the extension with
-the same email, account password and master password.
-
-The extension icons come from `assets/logo.svg`. Run `npm run icons` after changing the logo.
+- `npm run build:extension` writes the installable extension to **`dist/extension`** and a
+  zip to `public/downloads/securevault-extension.zip`, which is served on the `/extension` page.
+- In Chrome: `chrome://extensions` → **Developer mode** → **Load unpacked** → choose
+  `dist/extension`. The `extension/` folder holds source only and can't be loaded directly.
+- `npm run dev:extension` rebuilds on change. Click the reload icon on the extension card afterwards.
+- `npm run icons` regenerates the icons from `assets/logo.svg`.
 
 ## 🎨 Features
 

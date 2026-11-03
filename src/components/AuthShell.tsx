@@ -41,6 +41,9 @@ export default function AuthShell({ title, subtitle, children, aside }: AuthShel
               our servers.
             </span>
           </p>
+          <p className="mt-3 text-center text-[13px]">
+            <Link href="/extension">Get the browser extension</Link>
+          </p>
         </div>
       </main>
     </div>

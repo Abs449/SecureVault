@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, LogOut, Plus, Search, Tag, X } from 'lucide-react';
+import Link from 'next/link';
+import { Lock, LogOut, Plus, Puzzle, Search, Tag, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useVault } from '@/context/VaultContext';
 import { signOut } from '@/lib/auth';
@@ -64,6 +65,10 @@ export default function DashboardPage() {
           <Wordmark size={26} />
           <div className="flex items-center gap-1">
             <span className="mr-3 hidden max-w-[240px] truncate text-sm text-fg-muted md:block">{user.email}</span>
+            <Link href="/extension" className="btn btn-ghost btn-sm hover:no-underline">
+              <Puzzle size={15} />
+              <span className="hidden sm:inline">Extension</span>
+            </Link>
             <button onClick={lockVault} className="btn btn-ghost btn-sm">
               <Lock size={15} />
               <span className="hidden sm:inline">Lock</span>

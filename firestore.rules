@@ -1,23 +1,63 @@
 rules_version = '2';
+
+// SecureVault data model (all secrets are encrypted client-side before they reach Firestore):
+//   users/{uid}/config/crypto    { salt: string, verifier?: { data: string, iv: string } }
+//   users/{uid}/passwords/{id}   { encryptedData, iv, tags, createdAt, updatedAt }
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only access their own data
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validConfig(d) {
+      return d.keys().hasOnly(['salt', 'verifier'])
+        && d.salt is string && d.salt.size() > 0 && d.salt.size() <= 64
+        && (!('verifier' in d) || (
+              d.verifier is map
+              && d.verifier.keys().hasOnly(['data', 'iv'])
+              && d.verifier.data is string && d.verifier.data.size() <= 256
+              && d.verifier.iv is string && d.verifier.iv.size() <= 32));
+    }
+
+    function validEntry(d) {
+      return d.keys().hasOnly(['encryptedData', 'iv', 'tags', 'createdAt', 'updatedAt'])
+        && d.encryptedData is string && d.encryptedData.size() > 0 && d.encryptedData.size() <= 100000
+        && d.iv is string && d.iv.size() <= 32
+        && d.tags is list && d.tags.size() <= 50
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp;
+    }
+
     match /users/{userId} {
-      // Allow read/write only if authenticated and accessing own data
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Config subcollection (stores salt)
-      match /config/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Nothing is stored on the user document itself. Reads/deletes are allowed so older
+      // data written by early versions of the extension can still be cleaned up.
+      allow read, delete: if isOwner(userId);
+
+      match /config/crypto {
+        allow read, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && validConfig(request.resource.data);
+        // The salt is permanent: changing it would make every entry undecryptable.
+        // Updates exist only to add a verifier to accounts created before verifiers existed.
+        allow update: if isOwner(userId)
+          && validConfig(request.resource.data)
+          && request.resource.data.salt == resource.data.salt;
       }
-      
-      // Passwords subcollection (stores encrypted password entries)
-      match /passwords/{passwordId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /passwords/{entryId} {
+        allow read, delete: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && validEntry(request.resource.data)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && validEntry(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time;
       }
     }
-    
-    // Deny all other access
+
     match /{document=**} {
       allow read, write: if false;
     }

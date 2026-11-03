@@ -1,4 +1,5 @@
-// Builds the Chrome extension into dist/extension.
+// Builds the Chrome extension into dist/extension, and packages it as
+// public/downloads/securevault-extension.zip for the web app's /extension page.
 //
 //   npm run build:extension         production build
 //   npm run dev:extension           rebuild on change (unminified, with source maps)
@@ -7,34 +8,19 @@
 // web app uses) and compiled into the bundle, so there is no separate config file to manage.
 
 import { build, context } from 'esbuild';
-import { config as loadEnv } from 'dotenv';
 import { cpSync, existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadFirebaseConfig } from './firebase-env.mjs';
+import { zipDirectory } from './zip.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const srcDir = join(root, 'extension');
 const outDir = join(root, 'dist', 'extension');
+const zipFile = join(root, 'public', 'downloads', 'securevault-extension.zip');
 const watch = process.argv.includes('--watch');
 
-loadEnv({ path: join(root, '.env.local'), quiet: true });
-loadEnv({ path: join(root, '.env'), quiet: true });
-
-const ENV_KEYS = {
-  apiKey: 'NEXT_PUBLIC_FIREBASE_API_KEY',
-  authDomain: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-  projectId: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-  storageBucket: 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-  messagingSenderId: 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-  appId: 'NEXT_PUBLIC_FIREBASE_APP_ID',
-};
-
-const missing = Object.values(ENV_KEYS).filter((k) => !process.env[k]);
-if (missing.length) {
-  console.error(`\nCannot build the extension. Missing in .env.local:\n  ${missing.join('\n  ')}\n`);
-  process.exit(1);
-}
-const firebaseConfig = Object.fromEntries(Object.entries(ENV_KEYS).map(([k, env]) => [k, process.env[env]]));
+const firebaseConfig = loadFirebaseConfig(root);
 
 for (const size of [16, 32, 48, 128]) {
   if (!existsSync(join(srcDir, 'icons', `icon${size}.png`))) {
@@ -45,7 +31,7 @@ for (const size of [16, 32, 48, 128]) {
 
 function copyStatic() {
   mkdirSync(outDir, { recursive: true });
-  const manifest = JSON.parse(readFileSync(join(srcDir, 'manifest.json'), 'utf8'));
+  const manifest = JSON.parse(readFileSync(join(srcDir, 'src', 'manifest.json'), 'utf8'));
   manifest.version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version.replace(/-.*$/, '');
   writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
   cpSync(join(srcDir, 'src', 'popup.html'), join(outDir, 'popup.html'));
@@ -83,5 +69,7 @@ if (watch) {
   console.log(`\nWatching. Load ${outDir} via chrome://extensions → "Load unpacked".`);
 } else {
   await Promise.all(builds.map((options) => build(options)));
-  console.log(`\nExtension built: ${outDir}`);
+  mkdirSync(dirname(zipFile), { recursive: true });
+  writeFileSync(zipFile, zipDirectory(outDir, 'securevault-extension'));
+  console.log(`\nExtension built: ${outDir}\nDownload package: ${zipFile}`);
 }
