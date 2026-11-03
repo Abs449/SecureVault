@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, Copy, Download, KeyRound, MousePointerClick, Save } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Download, Keyboard, KeyRound, MousePointerClick, Puzzle, Save, WandSparkles } from 'lucide-react';
 import { Wordmark } from '@/components/Logo';
 import { useAuth } from '@/context/AuthContext';
 
 const DOWNLOAD_URL = '/downloads/securevault-extension.zip';
+/** Set once the extension is published, e.g. https://chromewebstore.google.com/detail/... */
+const WEBSTORE_URL = process.env.NEXT_PUBLIC_WEBSTORE_URL;
 
 function CopyText({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -64,14 +66,16 @@ const STEPS: { title: string; body: React.ReactNode }[] = [
   },
   {
     title: 'Pin it and sign in',
-    body: 'Click the puzzle-piece icon in the toolbar, pin SecureVault, then sign in with the same email, account password and master password you use here.',
+    body: 'A welcome tab opens after installing. Pin SecureVault from the puzzle-piece menu in the toolbar, then sign in with the same email, account password and master password you use here.',
   },
 ];
 
 const FEATURES = [
-  { icon: MousePointerClick, title: 'Fill', body: 'Logins for the site you are on, filled with one click.' },
-  { icon: Save, title: 'Save', body: 'Offers to save a login after you sign in to a site.' },
-  { icon: KeyRound, title: 'Generate', body: 'Right-click any password field to create a strong password.' },
+  { icon: MousePointerClick, title: 'Fills logins', body: 'Click into a sign-in field and pick a saved login from the list under it.' },
+  { icon: WandSparkles, title: 'Suggests strong passwords', body: 'Sign-up and change-password forms get a generated password in one click.' },
+  { icon: Save, title: 'Saves as you go', body: 'Offers to save new logins and update changed passwords.' },
+  { icon: Keyboard, title: 'Keyboard shortcut', body: 'Ctrl+Shift+L (⌘+Shift+L on Mac) fills the login for the current site.' },
+  { icon: KeyRound, title: 'Right-click to generate', body: 'Generate a password in any text field from the context menu.' },
 ];
 
 export default function ExtensionPage() {
@@ -97,18 +101,33 @@ export default function ExtensionPage() {
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <a href={DOWNLOAD_URL} download className="btn btn-primary hover:no-underline">
-            <Download size={16} />
-            Download extension
-          </a>
+          {WEBSTORE_URL ? (
+            <>
+              <a href={WEBSTORE_URL} target="_blank" rel="noopener noreferrer" className="btn btn-primary hover:no-underline">
+                <Puzzle size={16} />
+                Add to Chrome
+              </a>
+              <a href={DOWNLOAD_URL} download className="btn btn-secondary hover:no-underline">
+                <Download size={16} />
+                Download zip
+              </a>
+            </>
+          ) : (
+            <a href={DOWNLOAD_URL} download className="btn btn-primary hover:no-underline">
+              <Download size={16} />
+              Download extension
+            </a>
+          )}
           <span className="text-sm text-fg-subtle">Chrome or Edge, version 127 or later</span>
         </div>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
           <section className="panel p-6">
-            <h2 className="font-semibold">Install</h2>
+            <h2 className="font-semibold">{WEBSTORE_URL ? 'Install from the zip instead' : 'Install'}</h2>
             <p className="mt-1 text-sm text-fg-muted">
-              SecureVault isn&apos;t in the Chrome Web Store yet, so it&apos;s installed as an unpacked extension.
+              {WEBSTORE_URL
+                ? 'If you can’t use the Chrome Web Store, install the downloaded copy as an unpacked extension.'
+                : 'SecureVault isn’t in the Chrome Web Store yet, so it’s installed as an unpacked extension.'}
             </p>
             <ol className="mt-5 space-y-5">
               {STEPS.map((step, i) => (
@@ -137,7 +156,7 @@ export default function ExtensionPage() {
             ))}
             <p className="border-t border-border pt-5 text-[13px] leading-relaxed text-fg-subtle">
               The extension stays locked until you enter your master password, and locks itself again after a period
-              of inactivity you choose in its settings.
+              of inactivity you choose in its settings. <Link href="/privacy">Privacy policy</Link>
             </p>
           </aside>
         </div>

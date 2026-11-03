@@ -1,4 +1,4 @@
-// Renders assets/logo.svg into the PNG sizes Chrome needs. Run with `npm run icons`
+// Renders assets/logo.svg into the PNG sizes Chrome needs, plus the Web Store promo tile. Run with `npm run icons`
 // after changing the logo; the PNGs are committed so builds don't need this step.
 
 import { Resvg } from '@resvg/resvg-js';
@@ -19,3 +19,9 @@ for (const { size, file } of targets) {
   writeFileSync(file, png);
   console.log(`wrote ${file.replace(root, '.')} (${size}px)`);
 }
+
+// Chrome Web Store small promo tile (440x280).
+const promo = readFileSync(join(root, 'assets', 'promo-small.svg'), 'utf8');
+const promoFile = join(root, 'store', 'promo-small.png');
+writeFileSync(promoFile, new Resvg(promo, { font: { loadSystemFonts: true } }).render().asPng());
+console.log(`wrote ${promoFile.replace(root, '.')} (440x280)`);

@@ -60,21 +60,50 @@ A secure password manager built with Next.js, TypeScript, and Firebase, featurin
 - `npm run deploy:rules` deploys [firestore.rules](firestore.rules). Run
   `npx firebase-tools login` first. The rules restrict each user to their own data,
   validate document shapes, and stop the encryption salt from being overwritten.
+- `npm run test:rules` runs the backend checks against the Firebase emulators with
+  `firestore.rules` loaded. Run it before `deploy:rules`. It needs Java 11+, but no login and
+  no production data.
 - `npm run test:backend` runs an end-to-end check against the project in `.env.local`. It
   creates a throwaway account, exercises sign-up, unlock, add/edit/delete and the security
   rules, then deletes everything it created.
 
 ### 🧩 Chrome extension
 
-The extension shares its vault and crypto code with the web app (`src/lib/vault.ts`,
-`src/lib/crypto.ts`), so both read and write the same encrypted data.
+The extension works like a full password manager on every site:
 
-- `npm run build:extension` writes the installable extension to **`dist/extension`** and a
-  zip to `public/downloads/securevault-extension.zip`, which is served on the `/extension` page.
-- In Chrome: `chrome://extensions` → **Developer mode** → **Load unpacked** → choose
-  `dist/extension`. The `extension/` folder holds source only and can't be loaded directly.
-- `npm run dev:extension` rebuilds on change. Click the reload icon on the extension card afterwards.
-- `npm run icons` regenerates the icons from `assets/logo.svg`.
+- **Fills logins.** Focus a sign-in field and pick from the logins saved for that site, or press
+  `Ctrl+Shift+L` (`⌘+Shift+L` on Mac).
+- **Suggests strong passwords.** Sign-up and change-password fields get a generated 20-character
+  password that fills both the password and confirmation fields.
+- **Saves and updates.** After you sign in or sign up, it offers to save the login, or to update it
+  if the password changed.
+- **Works in embedded sign-in forms.** Login forms inside iframes get the same menu, matched to the
+  frame's own site, and their save prompt is shown on the main page.
+- **Stays safe.** Logins are only offered on the site they belong to, and passwords are released to a
+  page only when you choose to fill them. Menus and prompts sit in closed shadow roots the page
+  can't read, and the vault auto-locks.
+
+How it's built: the background service worker (`extension/src/background.ts`) is the vault engine.
+It is the only part that talks to Firebase or holds the key, and it uses the same
+`src/lib/vault.ts` and `src/lib/crypto.ts` as the web app (Firestore Lite in the worker). The popup,
+the welcome page and the content script are clients of it.
+
+| Command | What it does |
+| --- | --- |
+| `npm run build:extension` | Builds `dist/extension` (load unpacked), `dist/securevault-<version>-webstore.zip` (Chrome Web Store upload) and the download served on `/extension`. |
+| `npm run dev:extension` | Rebuilds on change. Click reload on the extension card afterwards. |
+| `npm run test:extension` | Installs the built extension in Chrome and tests sign-in, fill, password suggestion, save/update prompts, cross-site iframes and isolation (25 checks) against your Firebase project, using a throwaway account. |
+| `npm run icons` | Regenerates icons and the store promo tile from `assets/`. |
+
+To install locally: `chrome://extensions` → **Developer mode** → **Load unpacked** → `dist/extension`.
+The `extension/` folder holds source only.
+
+### 🏪 Publishing to the Chrome Web Store
+
+Everything the store asks for is in [store/LISTING.md](store/LISTING.md): listing text,
+permission justifications, data-use disclosures, screenshots, the promo tile and the upload zip.
+The privacy policy is served by the web app at `/privacy`. Once the listing is live, set
+`NEXT_PUBLIC_WEBSTORE_URL` and the `/extension` page shows **Add to Chrome**.
 
 ## 🎨 Features
 
@@ -87,7 +116,7 @@ The extension shares its vault and crypto code with the web app (`src/lib/vault.
 - ✅ Auto-lock after inactivity
 - ✅ Password strength indicator
 - ✅ Light and dark themes that follow the system setting
-- ✅ Chrome extension: fill logins, save new ones, generate passwords from the context menu
+- ✅ Chrome extension: inline autofill, strong-password suggestions, save/update prompts, keyboard shortcut
 
 ## 🧪 Technology Stack
 

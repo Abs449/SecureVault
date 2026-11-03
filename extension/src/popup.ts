@@ -1,15 +1,6 @@
-// SecureVault popup.
-// Uses the same vault module as the web app (src/lib/vault.ts), so both read and write
-// exactly the same encrypted format.
+// SecureVault popup: a UI over the background worker's vault engine (see background.ts).
 
 import './popup.css';
-import { initializeApp, type FirebaseOptions } from 'firebase/app';
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-} from 'firebase/auth/web-extension';
-import { getFirestore } from 'firebase/firestore';
 import {
   ArrowLeft,
   Check,
@@ -18,6 +9,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  Keyboard,
   Lock,
   LogOut,
   Pencil,
@@ -28,163 +20,62 @@ import {
   Trash2,
   X,
 } from 'lucide';
-import * as vault from '../../src/lib/vault';
-import { calculatePasswordStrength, exportKey, generatePassword, importKey } from '../../src/lib/crypto';
-import { friendlyAuthError } from '../../src/lib/errors';
-import type { DecryptedPasswordEntry } from '../../src/lib/types';
+import { calculatePasswordStrength, generatePassword } from '../../src/lib/crypto';
 import { h, icon } from './lib/dom';
+import { logoMark, monogram } from './lib/brand';
 import {
-  ContentMessage,
+  Entry,
+  EntryInput,
   LOCAL,
-  PendingLogin,
-  SESSION,
+  STRONG_PASSWORD,
   Settings,
+  StatusInfo,
+  call,
   getNeverSave,
   getSettings,
   hostOf,
   hostsMatch,
-  loginFingerprint,
 } from './lib/shared';
 
-declare const __FIREBASE_CONFIG__: FirebaseOptions;
-
-const app = initializeApp(__FIREBASE_CONFIG__);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
-type Entry = DecryptedPasswordEntry;
+declare const __APP_URL__: string;
 
 const state = {
-  key: null as CryptoKey | null,
+  info: null as StatusInfo | null,
   entries: [] as Entry[],
-  unreadable: 0,
   query: '',
   tab: null as { id: number; host: string | null } | null,
-  saveRequest: null as PendingLogin | null,
 };
 
 const root = document.getElementById('app')!;
-
-function mount(...nodes: (Node | null)[]) {
-  root.replaceChildren(...nodes.filter((n): n is Node => n !== null));
-}
-
-// ---------------------------------------------------------------------------
-// Session (chrome.storage.session: memory only, cleared when the browser closes)
-// ---------------------------------------------------------------------------
-async function touchActivity() {
-  await chrome.storage.session.set({ [SESSION.lastActivity]: Date.now() });
-}
-
-let lastTouch = 0;
-['pointerdown', 'keydown'].forEach((type) =>
-  document.addEventListener(type, () => {
-    if (Date.now() - lastTouch > 15_000) {
-      lastTouch = Date.now();
-      touchActivity();
-    }
-  })
-);
-
-async function persistUnlocked(uid: string, key: CryptoKey) {
-  await chrome.storage.session.set({
-    [SESSION.key]: await exportKey(key),
-    [SESSION.uid]: uid,
-    [SESSION.lastActivity]: Date.now(),
-  });
-  await refreshKnownLogins();
-}
-
-/** Fingerprints let the background worker skip prompts for logins that are already saved. */
-async function refreshKnownLogins() {
-  const prints = await Promise.all(
-    state.entries
-      .map((e) => ({ e, host: hostOf(e.url) }))
-      .filter((x) => x.host)
-      .map(({ e, host }) => loginFingerprint(host!, e.username, e.password))
-  );
-  await chrome.storage.session.set({ [SESSION.knownLogins]: prints });
-}
-
-async function restoreKey(uid: string): Promise<CryptoKey | null> {
-  const s = await chrome.storage.session.get([SESSION.key, SESSION.uid, SESSION.lastActivity]);
-  if (!s[SESSION.key] || s[SESSION.uid] !== uid) return null;
-  const { autoLockMinutes } = await getSettings();
-  if (Date.now() - ((s[SESSION.lastActivity] as number) ?? 0) > autoLockMinutes * 60_000) {
-    await chrome.storage.session.remove([SESSION.key, SESSION.knownLogins]);
-    return null;
-  }
-  return importKey(s[SESSION.key] as string);
-}
-
-async function lock() {
-  state.key = null;
-  state.entries = [];
-  await chrome.storage.session.remove([SESSION.key, SESSION.knownLogins]);
-  renderLocked();
-}
-
-async function signOut() {
-  await firebaseSignOut(auth).catch(() => {});
-  state.key = null;
-  state.entries = [];
-  await chrome.storage.session.remove([SESSION.key, SESSION.uid, SESSION.knownLogins, SESSION.saveRequest]);
-  renderSignIn();
-}
+const mount = (...nodes: (Node | null)[]) => root.replaceChildren(...nodes.filter((n): n is Node => n !== null));
 
 // ---------------------------------------------------------------------------
 // Startup
 // ---------------------------------------------------------------------------
 async function start() {
   mount(h('div', { class: 'center' }, h('div', { class: 'spinner' })));
-
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
-  state.tab = tab?.id !== undefined ? { id: tab.id, host: tab.url ? hostOf(tab.url) : null } : null;
-
-  const req = await chrome.storage.session.get(SESSION.saveRequest);
-  state.saveRequest = (req[SESSION.saveRequest] as PendingLogin | undefined) ?? null;
-  chrome.action.setBadgeText({ text: '' });
-
-  await auth.authStateReady();
-  const user = auth.currentUser;
-  if (!user) return renderSignIn();
-
-  try {
-    const key = await restoreKey(user.uid);
-    if (!key) return renderLocked();
-    state.key = key;
-    ({ entries: state.entries, unreadable: state.unreadable } = await vault.loadEntries(db, user.uid, key));
-    await touchActivity();
-    afterUnlock();
-  } catch (err) {
-    console.error(err);
-    renderLocked();
-  }
+  state.tab = tab?.id !== undefined ? { id: tab.id, host: hostOf(tab.url) } : null;
+  await route();
 }
 
-function afterUnlock() {
-  if (state.saveRequest) {
-    const req = state.saveRequest;
-    state.saveRequest = null;
-    chrome.storage.session.remove(SESSION.saveRequest);
-    const existing = state.entries.find(
-      (e) => e.username === req.username && hostsMatch(req.hostname, hostOf(e.url) ?? '')
-    );
-    if (existing && existing.password === req.password) {
-      renderVault();
-      toast('This login is already saved');
-      return;
-    }
-    if (existing) return renderEdit(existing, { password: req.password }, 'Update the saved password?');
-    return renderEdit(null, {
-      title: req.hostname,
-      url: req.url,
-      username: req.username,
-      password: req.password,
-    });
+async function route() {
+  try {
+    state.info = await call<StatusInfo>({ type: 'status' });
+  } catch (err) {
+    mount(h('div', { class: 'auth' }, errorBox((err as Error).message)));
+    return;
+  }
+  if (state.info.status === 'signed-out') return renderSignIn();
+  if (state.info.status === 'locked') return renderLocked();
+
+  state.entries = await call<Entry[]>({ type: 'list' });
+  if (state.info.pendingSaveHost) {
+    const res = await call<{ result: string; hostname: string } | null>({ type: 'take-save-request' }).catch(() => null);
+    state.entries = await call<Entry[]>({ type: 'list' });
+    renderVault();
+    if (res) toast(res.result === 'updated' ? `Password updated for ${res.hostname}` : res.result === 'unchanged' ? 'Already saved' : `Saved login for ${res.hostname}`);
+    return;
   }
   renderVault();
 }
@@ -192,44 +83,6 @@ function afterUnlock() {
 // ---------------------------------------------------------------------------
 // Shared pieces
 // ---------------------------------------------------------------------------
-function logoMark(size = 22) {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', '0 0 128 128');
-  svg.setAttribute('width', String(size));
-  svg.setAttribute('height', String(size));
-  svg.setAttribute('aria-hidden', 'true');
-  const parts: [string, Record<string, string>][] = [
-    ['rect', { width: '128', height: '128', rx: '30', fill: 'var(--accent)' }],
-    ['circle', { cx: '64', cy: '53', r: '19', fill: '#fff' }],
-    ['path', { d: 'M55.5 62h17l6.2 31.2a4 4 0 0 1-3.9 4.8H53.2a4 4 0 0 1-3.9-4.8z', fill: '#fff' }],
-  ];
-  for (const [tag, attrs] of parts) {
-    const el = document.createElementNS(ns, tag);
-    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
-    svg.append(el);
-  }
-  return svg;
-}
-
-const MONOGRAM_COLORS = ['#1d4ed8', '#0f766e', '#6d28d9', '#be123c', '#b45309', '#0369a1', '#4d7c0f', '#475569'];
-
-function monogram(title: string, size = 32) {
-  let hash = 0;
-  for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) | 0;
-  return h(
-    'span',
-    {
-      class: 'monogram',
-      style: `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px;background:${
-        MONOGRAM_COLORS[Math.abs(hash) % MONOGRAM_COLORS.length]
-      }`,
-      'aria-hidden': 'true',
-    },
-    title.trim().charAt(0).toUpperCase() || '?'
-  );
-}
-
 function iconButton(node: Parameters<typeof icon>[0], label: string, onClick: (e: MouseEvent) => void, extra = '') {
   return h('button', { class: `icon-btn ${extra}`, title: label, 'aria-label': label, type: 'button', onclick: onClick }, icon(node));
 }
@@ -274,7 +127,7 @@ function toast(message: string, kind: 'ok' | 'error' = 'ok') {
   clearTimeout(toastTimer);
   const node = h('div', { class: `toast ${kind}`, role: 'status' }, icon(kind === 'ok' ? Check : CircleAlert, 15), message);
   document.body.append(node);
-  toastTimer = setTimeout(() => node.remove(), 2200);
+  toastTimer = setTimeout(() => node.remove(), 2400);
 }
 
 function busy(button: HTMLButtonElement, on: boolean, label?: string) {
@@ -283,10 +136,15 @@ function busy(button: HTMLButtonElement, on: boolean, label?: string) {
   else if (label) button.replaceChildren(label);
 }
 
+function webLink(path: string, label: string) {
+  if (!__APP_URL__) return null;
+  return h('a', { class: 'link-btn', href: new URL(path, __APP_URL__).href, target: '_blank', rel: 'noopener' }, label);
+}
+
 // ---------------------------------------------------------------------------
-// Views: sign in / locked
+// Sign in / locked
 // ---------------------------------------------------------------------------
-function authLayout(title: string, subtitle: string, form: HTMLFormElement, footer?: Node) {
+function authLayout(title: string, subtitle: string, form: HTMLFormElement, ...footer: (Node | null)[]) {
   mount(
     h(
       'div',
@@ -295,158 +153,144 @@ function authLayout(title: string, subtitle: string, form: HTMLFormElement, foot
       h('h1', { class: 'auth-title' }, title),
       h('p', { class: 'auth-sub' }, subtitle),
       form,
-      footer
+      h('div', { class: 'auth-footer' }, ...footer)
     )
   );
 }
 
-function saveRequestNote() {
-  return state.saveRequest
-    ? h('p', { class: 'note' }, `Unlock to save the login for ${state.saveRequest.hostname}.`)
-    : null;
+function pendingNote() {
+  const host = state.info?.pendingSaveHost;
+  return host ? h('p', { class: 'note' }, `Unlock to save the login for ${host}.`) : null;
 }
 
-function renderSignIn(error?: string) {
+function renderSignIn() {
   const email = h('input', { class: 'input', type: 'email', autocomplete: 'username', required: true, autofocus: true });
   const account = passwordInput({ autocomplete: 'current-password', required: true });
   const master = passwordInput({ autocomplete: 'off', required: true });
   const submit = h('button', { class: 'btn primary block', type: 'submit' }, 'Sign in');
-  const errorSlot = h('div', null, error ? errorBox(error) : null);
+  const errorSlot = h('div');
 
   const form = h(
     'form',
     { class: 'stack' },
-    saveRequestNote(),
+    pendingNote(),
     field('Email', email),
     field('Account password', account.node),
     field('Master password', master.node, 'Decrypts your vault on this device.'),
     errorSlot,
     submit
   );
-
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorSlot.replaceChildren();
     busy(submit, true);
-    let uid: string;
     try {
-      uid = (await signInWithEmailAndPassword(auth, email.value.trim(), account.input.value)).user.uid;
+      await call({ type: 'sign-in', email: email.value, password: account.input.value, master: master.input.value });
+      await route();
     } catch (err) {
-      busy(submit, false, 'Sign in');
-      errorSlot.replaceChildren(errorBox(friendlyAuthError(err)));
-      return;
-    }
-    try {
-      const { key, entries, unreadable } = await vault.unlockVault(db, uid, master.input.value, { extractableKey: true });
-      state.key = key;
-      state.entries = entries;
-      state.unreadable = unreadable;
-      await persistUnlocked(uid, key);
-      afterUnlock();
-    } catch (err) {
-      await firebaseSignOut(auth).catch(() => {});
       busy(submit, false, 'Sign in');
       master.input.value = '';
       errorSlot.replaceChildren(errorBox((err as Error).message));
     }
   });
 
-  authLayout('Sign in to SecureVault', 'Use the account you created in the web app.', form);
+  authLayout(
+    'Sign in to SecureVault',
+    'Use the account you created in the web app.',
+    form,
+    webLink('/register', 'Create an account')
+  );
 }
 
-function renderLocked(error?: string) {
-  const user = auth.currentUser;
-  if (!user) return renderSignIn();
-
+function renderLocked() {
   const master = passwordInput({ autocomplete: 'off', required: true, autofocus: true });
   const submit = h('button', { class: 'btn primary block', type: 'submit' }, 'Unlock');
-  const errorSlot = h('div', null, error ? errorBox(error) : null);
+  const errorSlot = h('div');
 
-  const form = h('form', { class: 'stack' }, saveRequestNote(), field('Master password', master.node), errorSlot, submit);
+  const form = h('form', { class: 'stack' }, pendingNote(), field('Master password', master.node), errorSlot, submit);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorSlot.replaceChildren();
     busy(submit, true);
     try {
-      const { key, entries, unreadable } = await vault.unlockVault(db, user.uid, master.input.value, { extractableKey: true });
-      state.key = key;
-      state.entries = entries;
-      state.unreadable = unreadable;
-      await persistUnlocked(user.uid, key);
-      afterUnlock();
+      await call({ type: 'unlock', master: master.input.value });
+      await route();
     } catch (err) {
       busy(submit, false, 'Unlock');
       master.input.value = '';
       master.input.focus();
-      errorSlot.replaceChildren(errorBox(friendlyAuthError(err)));
+      errorSlot.replaceChildren(errorBox((err as Error).message));
     }
   });
 
   authLayout(
     'Vault locked',
-    user.email ?? '',
+    state.info?.email ?? '',
     form,
     h('button', { class: 'link-btn', type: 'button', onclick: signOut }, 'Sign in with a different account')
   );
 }
 
+async function lock() {
+  await call({ type: 'lock' });
+  state.entries = [];
+  await route();
+}
+
+async function signOut() {
+  await call({ type: 'sign-out' }).catch(() => {});
+  state.entries = [];
+  await route();
+}
+
 // ---------------------------------------------------------------------------
-// View: vault list
+// Vault list
 // ---------------------------------------------------------------------------
 function siteMatches(): Entry[] {
   const host = state.tab?.host;
   if (!host) return [];
   return state.entries.filter((e) => {
-    const h2 = hostOf(e.url);
-    return h2 !== null && hostsMatch(host, h2);
+    const eh = hostOf(e.url);
+    return eh !== null && hostsMatch(host, eh);
   });
 }
 
 function renderVault() {
-  const search = h('input', {
-    class: 'input search',
-    type: 'search',
-    placeholder: 'Search vault',
-    value: state.query,
-    'aria-label': 'Search vault',
-  });
+  const search = h('input', { class: 'input search', type: 'search', placeholder: 'Search vault', value: state.query, 'aria-label': 'Search vault' });
   const list = h('div', { class: 'list-area' });
 
   const draw = () => {
     const q = state.query.trim().toLowerCase();
     const sections: Node[] = [];
-    if (state.unreadable > 0) {
-      sections.push(h('p', { class: 'note warn' }, `${state.unreadable} item(s) couldn't be decrypted and are hidden.`));
+    if (state.info?.unreadable) {
+      sections.push(h('p', { class: 'note warn' }, `${state.info.unreadable} item(s) couldn't be decrypted and are hidden.`));
     }
 
-    if (!q) {
+    if (!q && state.tab?.host) {
+      const host = state.tab.host;
       const matches = siteMatches();
-      if (state.tab?.host) {
-        sections.push(
-          h('h2', { class: 'section-title' }, 'This site', h('span', { class: 'section-meta' }, state.tab.host)),
-          matches.length
-            ? h('ul', { class: 'rows' }, matches.map((e) => row(e, true)))
-            : h(
-                'div',
-                { class: 'site-empty' },
-                h('span', null, 'No saved logins for this site.'),
-                h('button', { class: 'link-btn accent', type: 'button', onclick: () => renderEdit(null, { title: state.tab!.host!, url: `https://${state.tab!.host}` }) }, 'Add one')
-              )
-        );
-      }
+      sections.push(
+        h('h2', { class: 'section-title' }, 'This site', h('span', { class: 'section-meta' }, host)),
+        matches.length
+          ? h('ul', { class: 'rows' }, matches.map((e) => row(e, true)))
+          : h(
+              'div',
+              { class: 'site-empty' },
+              h('span', null, 'No saved logins for this site.'),
+              h('button', { class: 'link-btn accent', type: 'button', onclick: () => renderEdit(null, { title: host, url: `https://${host}` }) }, 'Add one')
+            )
+      );
     }
 
     const all = q
       ? state.entries.filter((e) => [e.title, e.username, e.url, ...e.tags].some((v) => v.toLowerCase().includes(q)))
       : state.entries;
-
     sections.push(h('h2', { class: 'section-title' }, q ? 'Results' : 'All items', h('span', { class: 'section-meta' }, String(all.length))));
-    if (all.length) sections.push(h('ul', { class: 'rows' }, all.map((e) => row(e, false))));
-    else
-      sections.push(
-        h('p', { class: 'empty' }, q ? 'Nothing matches that search.' : 'Your vault is empty. Logins you add are encrypted before they leave this device.')
-      );
-
+    sections.push(
+      all.length
+        ? h('ul', { class: 'rows' }, all.map((e) => row(e, false)))
+        : h('p', { class: 'empty' }, q ? 'Nothing matches that search.' : 'Your vault is empty. Sign in to a website and SecureVault will offer to save the login.')
+    );
     list.replaceChildren(...sections);
   };
 
@@ -454,8 +298,8 @@ function renderVault() {
     state.query = search.value;
     draw();
   });
-
   draw();
+
   mount(
     h(
       'header',
@@ -495,42 +339,29 @@ function row(entry: Entry, fillable: boolean) {
 }
 
 async function fillEntry(entry: Entry) {
-  const host = hostOf(entry.url);
-  const tab = state.tab;
-  if (!tab?.host || !host || !hostsMatch(tab.host, host)) {
-    toast("This login isn't for the current site", 'error');
-    return;
-  }
-  const message: ContentMessage = { type: 'fill', hostname: host, username: entry.username, password: entry.password };
-  const send = () => chrome.tabs.sendMessage(tab.id, message, { frameId: 0 }) as Promise<{ filled: boolean } | undefined>;
-  let res: { filled: boolean } | undefined;
+  if (!state.tab) return;
   try {
-    res = await send();
-  } catch {
-    // Tabs opened before the extension was installed have no content script yet.
-    try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-      res = await send();
-    } catch {
-      res = undefined;
-    }
+    const filled = await call<boolean>({ type: 'fill-tab', id: entry.id, tabId: state.tab.id });
+    if (filled) window.close();
+    else toast('No login form found on this page', 'error');
+  } catch (err) {
+    toast((err as Error).message, 'error');
   }
-  if (res?.filled) window.close();
-  else toast('No login form found on this page', 'error');
 }
 
 // ---------------------------------------------------------------------------
-// View: item detail
+// Item detail
 // ---------------------------------------------------------------------------
 function renderItem(entry: Entry) {
   const host = hostOf(entry.url);
   const canFill = Boolean(host && state.tab?.host && hostsMatch(state.tab.host, host));
+  const masked = () => '•'.repeat(Math.min(entry.password.length, 16));
 
-  const pw = h('span', { class: 'mono' }, '•'.repeat(Math.min(entry.password.length, 16)));
+  const pw = h('span', { class: 'mono' }, masked());
   let shown = false;
   const reveal = iconButton(Eye, 'Show password', () => {
     shown = !shown;
-    pw.textContent = shown ? entry.password : '•'.repeat(Math.min(entry.password.length, 16));
+    pw.textContent = shown ? entry.password : masked();
     reveal.replaceChildren(icon(shown ? EyeOff : Eye));
   });
 
@@ -559,7 +390,7 @@ function renderItem(entry: Entry) {
 }
 
 // ---------------------------------------------------------------------------
-// View: add / edit
+// Add / edit
 // ---------------------------------------------------------------------------
 function normalizeUrl(value: string) {
   const v = value.trim();
@@ -572,9 +403,8 @@ function strengthMeter(input: HTMLInputElement) {
   const label = h('span', { class: 'strength-label' });
   const node = h('div', { class: 'strength' }, h('div', { class: 'strength-bars' }, bars), label);
   const update = () => {
-    const v = input.value;
-    node.hidden = !v;
-    const score = calculatePasswordStrength(v);
+    node.hidden = !input.value;
+    const score = calculatePasswordStrength(input.value);
     const [level, n] = score < 40 ? ['weak', 1] : score < 70 ? ['fair', 2] : ['strong', 3];
     node.dataset.level = String(level);
     label.textContent = String(level).charAt(0).toUpperCase() + String(level).slice(1);
@@ -585,7 +415,7 @@ function strengthMeter(input: HTMLInputElement) {
   return { node, update };
 }
 
-function renderEdit(entry: Entry | null, prefill: Partial<Entry> = {}, banner?: string) {
+function renderEdit(entry: Entry | null, prefill: Partial<Entry> = {}) {
   const base = { ...entry, ...prefill };
   const title = h('input', { class: 'input', required: true, value: base.title ?? '' });
   const username = h('input', { class: 'input', autocomplete: 'off', spellcheck: false, value: base.username ?? '' });
@@ -597,7 +427,7 @@ function renderEdit(entry: Entry | null, prefill: Partial<Entry> = {}, banner?: 
       class: 'link-btn accent',
       type: 'button',
       onclick: () => {
-        pw.input.value = generatePassword({ length: 20, includeUppercase: true, includeLowercase: true, includeNumbers: true, includeSymbols: true });
+        pw.input.value = generatePassword(STRONG_PASSWORD);
         pw.input.type = 'text';
         strength.update();
       },
@@ -609,7 +439,6 @@ function renderEdit(entry: Entry | null, prefill: Partial<Entry> = {}, banner?: 
   const notes = h('textarea', { class: 'input', rows: 3 });
   notes.value = base.notes ?? '';
   const tags = h('input', { class: 'input', placeholder: 'work, finance', value: (base.tags ?? []).join(', ') });
-
   const errorSlot = h('div');
   const save = h('button', { class: 'btn primary', type: 'submit' }, 'Save');
 
@@ -619,16 +448,9 @@ function renderEdit(entry: Entry | null, prefill: Partial<Entry> = {}, banner?: 
     h(
       'div',
       { class: 'scroll pad stack' },
-      banner && h('p', { class: 'note' }, banner),
       field('Name', title),
       field('Username', username),
-      h(
-        'div',
-        { class: 'field' },
-        h('div', { class: 'field-row' }, h('span', { class: 'field-label' }, 'Password'), generate),
-        pw.node,
-        strength.node
-      ),
+      h('div', { class: 'field' }, h('div', { class: 'field-row' }, h('span', { class: 'field-label' }, 'Password'), generate), pw.node, strength.node),
       field('Website', url),
       field('Notes', notes),
       field('Tags', tags, 'Comma-separated. Stored unencrypted for filtering.'),
@@ -645,9 +467,7 @@ function renderEdit(entry: Entry | null, prefill: Partial<Entry> = {}, banner?: 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorSlot.replaceChildren();
-    const uid = auth.currentUser?.uid;
-    if (!uid || !state.key) return lock();
-    const input: vault.EntryInput = {
+    const input: EntryInput = {
       title: title.value.trim(),
       username: username.value.trim(),
       password: pw.input.value,
@@ -657,21 +477,15 @@ function renderEdit(entry: Entry | null, prefill: Partial<Entry> = {}, banner?: 
     };
     busy(save, true);
     try {
-      let saved: Entry;
-      if (entry) {
-        await vault.updateEntry(db, uid, state.key, entry.id, input);
-        saved = { ...entry, ...input, updatedAt: Date.now() };
-        state.entries = [saved, ...state.entries.filter((x) => x.id !== entry.id)];
-      } else {
-        saved = await vault.addEntry(db, uid, state.key, input);
-        state.entries = [saved, ...state.entries];
-      }
-      await refreshKnownLogins();
+      const saved = entry
+        ? await call<Entry>({ type: 'update', id: entry.id, input })
+        : await call<Entry>({ type: 'add', input });
+      state.entries = [saved, ...state.entries.filter((x) => x.id !== saved.id)];
       renderItem(saved);
       toast('Saved');
     } catch (err) {
       busy(save, false, 'Save');
-      errorSlot.replaceChildren(errorBox(friendlyAuthError(err)));
+      errorSlot.replaceChildren(errorBox((err as Error).message));
     }
   });
 
@@ -689,25 +503,22 @@ function deleteButton(entry: Entry) {
       button.replaceChildren('Confirm delete');
       return;
     }
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
     busy(button, true);
     try {
-      await vault.deleteEntry(db, uid, entry.id);
+      await call({ type: 'delete', id: entry.id });
       state.entries = state.entries.filter((x) => x.id !== entry.id);
-      await refreshKnownLogins();
       renderVault();
       toast('Deleted');
     } catch (err) {
       busy(button, false, 'Delete');
-      toast(friendlyAuthError(err), 'error');
+      toast((err as Error).message, 'error');
     }
   });
   return button;
 }
 
 // ---------------------------------------------------------------------------
-// View: settings
+// Settings
 // ---------------------------------------------------------------------------
 async function renderSettings() {
   const [settings, neverSave] = await Promise.all([getSettings(), getNeverSave()]);
@@ -715,8 +526,11 @@ async function renderSettings() {
     await chrome.storage.local.set({ [LOCAL.settings]: { ...(await getSettings()), ...patch } });
   };
 
-  const offer = h('input', { type: 'checkbox', class: 'switch', checked: settings.offerToSave });
-  offer.addEventListener('change', () => update({ offerToSave: offer.checked }));
+  const toggle = (checked: boolean, key: 'offerToSave' | 'inlineMenu') => {
+    const input = h('input', { type: 'checkbox', class: 'switch', checked });
+    input.addEventListener('change', () => update({ [key]: input.checked }));
+    return input;
+  };
 
   const autoLock = h(
     'select',
@@ -756,15 +570,24 @@ async function renderSettings() {
       h(
         'section',
         { class: 'group' },
-        setting('Offer to save logins', 'Ask after you sign in to a site.', offer),
+        setting('Suggestions in forms', 'Show saved logins and strong passwords under fields.', toggle(settings.inlineMenu, 'inlineMenu')),
+        setting('Offer to save logins', 'Ask after you sign in or sign up on a site.', toggle(settings.offerToSave, 'offerToSave')),
         setting('Auto-lock', 'Lock after this long without activity.', autoLock)
+      ),
+      h(
+        'section',
+        { class: 'group' },
+        h('p', { class: 'setting-title' }, 'Keyboard shortcuts'),
+        h('p', { class: 'setting-desc' }, 'Fill the login for the current site with Ctrl+Shift+L (⌘+Shift+L on Mac).'),
+        h('button', { class: 'btn block', type: 'button', onclick: () => chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }) }, icon(Keyboard, 15), 'Change shortcuts')
       ),
       h('section', { class: 'group' }, h('p', { class: 'setting-title' }, 'Never offer to save on'), neverList),
       h(
         'section',
         { class: 'group' },
         h('p', { class: 'setting-title' }, 'Account'),
-        h('p', { class: 'setting-desc' }, auth.currentUser?.email ?? ''),
+        h('p', { class: 'setting-desc' }, state.info?.email ?? ''),
+        webLink('/dashboard', 'Open web vault'),
         h('button', { class: 'btn block', type: 'button', onclick: signOut }, icon(LogOut, 15), 'Sign out')
       ),
       h('p', { class: 'meta center-text' }, `SecureVault ${chrome.runtime.getManifest().version}`)

@@ -2,20 +2,24 @@
 // Creates a throwaway account, exercises the vault through src/lib/vault.ts (the same code
 // the web app and extension use), checks the security rules, then deletes everything it made.
 //
-//   npm run test:backend
+//   npm run test:backend     against the real project
+//   npm run test:rules       against the local emulators, with firestore.rules loaded
+//                            (needs Java 11+; no login or production data involved)
 
 import { initializeApp } from 'firebase/app';
 import {
+  connectAuthEmulator,
   createUserWithEmailAndPassword,
   deleteUser,
   getAuth,
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { collection, deleteDoc, doc, getDocs, getFirestore, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, connectFirestoreEmulator, deleteDoc, doc, getDocs, getFirestore, setDoc, updateDoc } from 'firebase/firestore';
 import * as vault from '../src/lib/vault';
 
 declare const __FIREBASE_CONFIG__: Record<string, string>;
+declare const __EMULATOR__: boolean;
 
 let failures = 0;
 const check = (cond: boolean, label: string) => {
@@ -27,6 +31,11 @@ const rejects = async (fn: () => Promise<unknown>) => fn().then(() => false, () 
 const app = initializeApp(__FIREBASE_CONFIG__);
 const auth = getAuth(app);
 const db = getFirestore(app);
+if (__EMULATOR__) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  console.log('Using local emulators with firestore.rules');
+}
 
 const email = `sv-e2e-${Date.now()}@example.com`;
 const accountPassword = 'Acct-pass-123';

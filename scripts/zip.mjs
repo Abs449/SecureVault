@@ -10,14 +10,19 @@ function listFiles(dir) {
   });
 }
 
-/** Zip every file under `dir`, placed inside a top-level folder named `folder`. */
+/** Zip every file under `dir`, optionally inside a top-level folder named `folder`. */
 export function zipDirectory(dir, folder) {
+  // DOS date/time for the entries (a zero date is invalid and some validators reject it).
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
   const locals = [];
   const centrals = [];
   let offset = 0;
 
   for (const file of listFiles(dir).sort()) {
-    const name = Buffer.from(`${folder}/${relative(dir, file).split(sep).join('/')}`);
+    const path = relative(dir, file).split(sep).join('/');
+    const name = Buffer.from(folder ? `${folder}/${path}` : path);
     const data = readFileSync(file);
     const packed = deflateRawSync(data, { level: 9 });
     const crc = crc32(data);
@@ -27,7 +32,8 @@ export function zipDirectory(dir, folder) {
     local.writeUInt16LE(20, 4); // version needed
     local.writeUInt16LE(0x0800, 6); // UTF-8 names
     local.writeUInt16LE(8, 8); // deflate
-    local.writeUInt32LE(0, 10); // time/date
+    local.writeUInt16LE(dosTime, 10);
+    local.writeUInt16LE(dosDate, 12);
     local.writeUInt32LE(crc, 14);
     local.writeUInt32LE(packed.length, 18);
     local.writeUInt32LE(data.length, 22);
@@ -40,6 +46,8 @@ export function zipDirectory(dir, folder) {
     central.writeUInt16LE(20, 6);
     central.writeUInt16LE(0x0800, 8);
     central.writeUInt16LE(8, 10);
+    central.writeUInt16LE(dosTime, 12);
+    central.writeUInt16LE(dosDate, 14);
     central.writeUInt32LE(crc, 16);
     central.writeUInt32LE(packed.length, 20);
     central.writeUInt32LE(data.length, 24);

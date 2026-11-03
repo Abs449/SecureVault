@@ -43,6 +43,8 @@ export default function AuthShell({ title, subtitle, children, aside }: AuthShel
           </p>
           <p className="mt-3 text-center text-[13px]">
             <Link href="/extension">Get the browser extension</Link>
+            <span className="mx-2 text-fg-subtle">·</span>
+            <Link href="/privacy" className="text-fg-subtle">Privacy</Link>
           </p>
         </div>
       </main>

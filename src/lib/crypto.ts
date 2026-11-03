@@ -154,25 +154,37 @@ export function generatePassword(options: PasswordGeneratorOptions): string {
   const numbers = '0123456789';
   const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
 
-  let charset = '';
-  if (includeUppercase) charset += uppercase;
-  if (includeLowercase) charset += lowercase;
-  if (includeNumbers) charset += numbers;
-  if (includeSymbols) charset += symbols;
+  const sets = [
+    includeUppercase && uppercase,
+    includeLowercase && lowercase,
+    includeNumbers && numbers,
+    includeSymbols && symbols,
+  ].filter((set): set is string => Boolean(set));
 
-  if (charset.length === 0) {
+  if (sets.length === 0) {
     throw new Error('At least one character type must be selected');
   }
 
-  // Rejection sampling avoids the modulo bias of `x % charset.length`
-  const limit = Math.floor(0x100000000 / charset.length) * charset.length;
-  let password = '';
-  while (password.length < length) {
-    for (const x of crypto.getRandomValues(new Uint32Array(length))) {
-      if (x < limit && password.length < length) password += charset[x % charset.length];
-    }
+  const charset = sets.join('');
+  // One character from each selected set, so the result satisfies "must contain a number /
+  // symbol / uppercase letter" rules, then fill the rest from the full set and shuffle.
+  const chars = sets.slice(0, length).map((set) => set[randomInt(set.length)]);
+  while (chars.length < length) chars.push(charset[randomInt(charset.length)]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
   }
-  return password;
+  return chars.join('');
+}
+
+/** Uniform random integer in [0, max) from the CSPRNG, without modulo bias. */
+function randomInt(max: number): number {
+  const limit = Math.floor(0x100000000 / max) * max;
+  const buf = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(buf);
+  } while (buf[0] >= limit);
+  return buf[0] % max;
 }
 
 /**

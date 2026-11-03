@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "SecureVault",
-  "version": "1.1.0",
-  "description": "Fill and save logins from your SecureVault. Entries are encrypted and decrypted on your device.",
+  "name": "SecureVault Password Manager",
+  "short_name": "SecureVault",
+  "version": "1.2.0",
+  "description": "Fill, save and generate passwords. Your vault is encrypted on your device with AES-256 and only you hold the key.",
   "minimum_chrome_version": "127",
   "permissions": ["storage", "alarms", "contextMenus", "activeTab", "scripting"],
   "action": {
@@ -30,9 +31,19 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": ["content.js"],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": true
     }
   ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Shift+V", "mac": "Alt+Shift+V" },
+      "description": "Open SecureVault"
+    },
+    "fill-login": {
+      "suggested_key": { "default": "Ctrl+Shift+L", "mac": "Command+Shift+L" },
+      "description": "Fill the login for the current site"
+    }
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }

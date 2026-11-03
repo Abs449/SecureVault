@@ -1,6 +1,6 @@
 {
   "name": "secure-vault",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "predev": "node scripts/build-extension.mjs",
@@ -13,7 +13,9 @@
     "dev:extension": "node scripts/build-extension.mjs --watch",
     "icons": "node scripts/generate-icons.mjs",
     "test:backend": "node scripts/test-backend.mjs",
-    "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules"
+    "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules",
+    "test:extension": "node tests/extension.e2e.mjs",
+    "test:rules": "npx -y firebase-tools@latest emulators:exec --only auth,firestore --project demo-securevault \"node scripts/test-backend.mjs --emulator\""
   },
   "dependencies": {
     "@vercel/speed-insights": "^1.3.1",
